@@ -1,0 +1,1 @@
+# JadGPT-MiniMax
