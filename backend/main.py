@@ -85,7 +85,7 @@ def recommend():
         "calorie_goal":    calorie_goal,
         "protein_goal":    protein_goal,
         "total_found":     len(results),
-        "recommendations": results[:24],
+        "recommendations": results[:3],
     })
 
 
