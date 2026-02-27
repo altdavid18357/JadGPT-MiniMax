@@ -221,6 +221,49 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ── AI Plan section ────────────────────────────────────── */
+    #ai-plan-section { margin-bottom: 2rem; }
+    .ai-plan-box {
+      background: var(--white); border-radius: var(--r);
+      border: 1px solid var(--border); box-shadow: var(--shadow-s);
+      overflow: hidden;
+    }
+    .ai-plan-header {
+      display: flex; align-items: center; gap: .6rem;
+      padding: .75rem 1rem; background: var(--blue-light);
+      border-bottom: 1px solid var(--border);
+    }
+    .ai-plan-badge {
+      font-size: .68rem; font-weight: 700; padding: .2rem .55rem;
+      border-radius: 20px; background: var(--blue); color: #fff;
+      letter-spacing: .3px;
+    }
+    #ai-plan-loading {
+      display: flex; align-items: center; gap: .75rem;
+      padding: 1.25rem 1rem; font-size: .84rem; color: var(--gray);
+    }
+    #ai-plan-loading.hidden { display: none; }
+    #ai-plan-text {
+      white-space: pre-wrap; font-family: inherit; font-size: .84rem;
+      line-height: 1.65; color: var(--dark); padding: 1rem 1.1rem;
+      margin: 0; display: none;
+    }
+    #ai-plan-text.show { display: block; }
+    #ai-plan-error {
+      padding: .75rem 1rem; font-size: .82rem; color: var(--red);
+      background: #FEF2F2; display: none;
+    }
+    #ai-plan-error.show { display: block; }
+
+    /* Map button on cards */
+    .card-map-btn {
+      margin-top: .55rem; font-size: .71rem; font-weight: 600;
+      padding: .22rem .6rem; border-radius: 20px;
+      border: 1.5px solid var(--blue); background: transparent;
+      color: var(--blue); cursor: pointer; transition: var(--ease);
+    }
+    .card-map-btn:hover { background: var(--blue); color: #fff; }
+
     /* ── Map section ────────────────────────────────────────── */
     #map-section { margin-bottom: 2rem; }
     .map-wrap {
@@ -434,7 +477,7 @@
     </div>
   </div>
   <div class="hd-actions">
-    <button class="hd-btn" onclick="loadAgentRecs()" title="Refresh recommendations">↻</button>
+    <button class="hd-btn" onclick="loadRecs()" title="Refresh recommendations">↻</button>
     <button class="hd-btn" onclick="openOnboarding()" title="Edit preferences">⚙</button>
   </div>
 </header>
@@ -467,6 +510,25 @@
     <div id="loading-msg"><div class="spinner"></div>Fetching today's menu…</div>
     <div id="error-msg" class="hidden"></div>
     <div class="cards-grid" id="cards"></div>
+  </section>
+
+  <!-- ── AI Meal Combination ───────────────────────────────── -->
+  <section id="ai-plan-section">
+    <div class="sec-head">
+      <h2 class="sec-title">🤖 AI Meal Combination</h2>
+    </div>
+    <div class="ai-plan-box">
+      <div class="ai-plan-header">
+        <span style="font-size:.88rem;font-weight:700;color:var(--blue)">Personalized Meal Plan</span>
+        <span class="ai-plan-badge">MiniMax</span>
+      </div>
+      <div id="ai-plan-loading">
+        <div class="spinner" style="width:20px;height:20px;border-width:2px;flex-shrink:0"></div>
+        Building your personalized meal combination…
+      </div>
+      <pre id="ai-plan-text"></pre>
+      <div id="ai-plan-error"></div>
+    </div>
   </section>
 
   <!-- ── Map ───────────────────────────────────────────────── -->
@@ -575,7 +637,7 @@ function savePrefs() {
   localStorage.setItem('jadgpt_prefs', JSON.stringify(prefs));
   document.getElementById('onboarding').classList.add('hidden');
   renderPrefsBar(prefs);
-  loadAgentRecs();
+  loadRecs();
 }
 
 function openOnboarding() {
@@ -648,6 +710,9 @@ async function loadRecs() {
       cards.insertAdjacentHTML('beforeend', cardHTML(item));
     });
 
+    // Trigger AI meal plan after basic recs load
+    loadAiPlan();
+
   } catch (err) {
     loading.classList.add('hidden');
     errMsg.classList.remove('hidden');
@@ -668,7 +733,74 @@ function cardHTML(item) {
       <div class="card-loc">📍 ${esc(item.dining_hall)} &middot; ${esc(item.station)}</div>
       <div class="nut-row">${cal}${prot}</div>
       ${flags ? `<div class="flag-row">${flags}</div>` : ''}
+      <button class="card-map-btn" onclick="goToHallOnMap(${JSON.stringify(item.dining_hall)})">📍 View on map</button>
     </div>`;
+}
+
+/* ============================================================
+   AI MEAL PLAN
+   ============================================================ */
+async function loadAiPlan() {
+  const prefs = getPrefs();
+  if (!prefs) return;
+
+  const loading = document.getElementById('ai-plan-loading');
+  const planText = document.getElementById('ai-plan-text');
+  const planErr  = document.getElementById('ai-plan-error');
+
+  loading.classList.remove('hidden');
+  planText.classList.remove('show');
+  planErr.classList.remove('show');
+
+  try {
+    const restrictions = prefs.restrictions || [];
+    const res = await fetch(`${API}/agent/recommend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        restrictions,
+        calorie_goal: prefs.calorie_goal || 2000,
+        protein_goal: prefs.protein_goal || 50,
+      }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    loading.classList.add('hidden');
+
+    if (data.error) throw new Error(data.error);
+
+    planText.textContent = data.meal_plan || '';
+    planText.classList.add('show');
+
+    // Store picks for the map
+    if (data.picks?.length) {
+      if (!window._menuData) window._menuData = {};
+      window._menuData.aiPicks = data.picks;
+      // Auto-navigate map to first pick's hall
+      goToHallOnMap(data.picks[0].dining_hall);
+    }
+  } catch (err) {
+    loading.classList.add('hidden');
+    planErr.textContent = `Could not generate AI plan: ${err.message}`;
+    planErr.classList.add('show');
+  }
+}
+
+function goToHallOnMap(diningHallName) {
+  if (!diningHallName) return;
+  const nameLower = diningHallName.toLowerCase();
+  // Find the best matching hall in the HALLS array
+  let matchIdx = HALLS.findIndex(h =>
+    nameLower.includes(h.name.toLowerCase()) ||
+    h.name.toLowerCase().includes(nameLower.split(' ')[0].toLowerCase())
+  );
+  if (matchIdx === -1) return;
+  const btn = document.querySelectorAll('.hall-btn')[matchIdx];
+  if (btn) {
+    selectHall(matchIdx, btn);
+    document.getElementById('map-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 
 /* ============================================================
@@ -700,12 +832,26 @@ function selectHall(index, btn) {
   title.textContent = `${hall.name} — Today's Menu`;
   preview.classList.add('show');
 
-  // Try to show items from cached data first
-  const cached = window._menuData?.recommendations || [];
+  // Prefer AI picks for this hall, then fall back to cached recommendations
+  const hallNameLower = hall.name.toLowerCase();
   const slugMatch = hall.slug.replace('-college', '').replace(/-/g, ' ');
+
+  const aiPicks = (window._menuData?.aiPicks || []).filter(x =>
+    x.dining_hall?.toLowerCase().includes(hallNameLower) ||
+    x.dining_hall?.toLowerCase().includes(slugMatch)
+  );
+
+  if (aiPicks.length > 0) {
+    title.textContent = `${hall.name} — AI Picks ✨`;
+    renderPreviewItems(items, aiPicks);
+    preview.classList.add('show');
+    return;
+  }
+
+  const cached = window._menuData?.recommendations || [];
   const local = cached.filter(x =>
     x.dining_hall?.toLowerCase().includes(slugMatch) ||
-    x.dining_hall?.toLowerCase().includes(hall.name.toLowerCase())
+    x.dining_hall?.toLowerCase().includes(hallNameLower)
   ).slice(0, 6);
 
   if (local.length > 0) {
@@ -1390,7 +1536,7 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     document.getElementById('onboarding').classList.add('hidden');
     renderPrefsBar(prefs);
-    loadAgentRecs();
+    loadRecs();
   }
 
   initMap();

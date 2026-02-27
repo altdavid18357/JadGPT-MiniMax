@@ -97,8 +97,9 @@ def _fmt_item(item: dict) -> str:
     fat     = f"{item.get('fat_g')}g fat"        if item.get("fat_g")     else ""
     flags   = ", ".join(item.get("dietary_flags", [])) or "no special flags"
     station = f" [{item.get('station', '')}]" if item.get("station") else ""
+    serving = f" (serving: {item['serving_size']})" if item.get("serving_size") else ""
     parts   = [p for p in [cal, protein, carbs, fat] if p]
-    return f"- {item['name']}{station}: {' | '.join(parts)} | flags: {flags}"
+    return f"- {item['name']}{station}{serving}: {' | '.join(parts)} | flags: {flags}"
 
 
 def execute_tool(tool_name: str, tool_input: dict, rag, all_menus: dict) -> str:
@@ -168,15 +169,20 @@ def run_agent(
     messages = [{"role": "user", "content": user_message}]
     final_text = ""
 
-    for _ in range(max_turns):
+    for turn in range(max_turns):
+        is_last = (turn == max_turns - 1)
+
+        # On the final turn, strip tools so the model is forced to produce text
         try:
-            response = client.messages.create(
-                model=MODEL,
-                max_tokens=2048,
-                system=system_prompt,
-                tools=TOOLS,
-                messages=messages,
-            )
+            create_kwargs: dict = {
+                "model":      MODEL,
+                "max_tokens": 2048,
+                "system":     system_prompt,
+                "messages":   messages,
+            }
+            if not is_last:
+                create_kwargs["tools"] = TOOLS
+            response = client.messages.create(**create_kwargs)
         except anthropic.APIError as e:
             if "tool" in str(e).lower() or "function" in str(e).lower():
                 response = client.messages.create(
@@ -211,9 +217,21 @@ def run_agent(
                 "tool_use_id": tu.id,
                 "content":     result_text,
             })
+
+        # On the second-to-last turn, nudge the model to finalize next
+        if turn == max_turns - 2:
+            tool_results.append({
+                "type": "text",
+                "text": (
+                    "You now have enough data. Your NEXT response must be the "
+                    "final meal recommendation in the specified format — "
+                    "do NOT call any more tools."
+                ),
+            })
+
         messages.append({"role": "user", "content": tool_results})
 
-    return final_text or "[Agent reached max turns]"
+    return final_text or "[Agent did not produce a response]"
 
 
 # ============================================================
@@ -222,41 +240,67 @@ def run_agent(
 
 def run_recommender(prefs: dict, rag, all_menus: dict, meal: str) -> str:
     """
-    Single agent that searches today's menu and recommends the best
-    meal options based on the user's goals and restrictions.
+    Single agent that searches today's menu and recommends a meal combination
+    with portion sizes that together hit the user's calorie and protein goals.
     """
-    system = """You are a helpful Yale dining hall food advisor.
-Your job: recommend the best meal options from today's dining menu based on the user's goals, restrictions, and preferences.
+    calorie_goal = int(prefs.get("calorie_goal", 2000))
+    protein_goal = int(prefs.get("protein_goal", 50))
+    # For a single meal, target roughly 1/3 of daily goals
+    meal_cal_target  = round(calorie_goal / 3)
+    meal_prot_target = round(protein_goal / 3)
 
-Rules:
-- Use the search and filter tools to find REAL items available today
-- Always respect dietary restrictions and allergies — these are non-negotiable
-- Cite actual food names, calorie counts, and protein numbers
-- Keep your recommendation focused and practical
+    system = f"""You are a Yale dining hall nutritionist helping students build an optimal meal plate.
 
-Your response must follow this format:
+Your job: recommend a COMBINATION of 2–3 dishes from today's menu that together hit the student's meal targets.
 
-🍽️  RECOMMENDED MEAL:
-1. [Dish name] — [why it fits, with key nutrition stats]
-2. [Dish name] — [why it fits, with key nutrition stats]
-3. [Dish name] — [why it fits, with key nutrition stats]
+MEAL TARGETS FOR THIS {meal.upper()}:
+  Calories: ~{meal_cal_target} kcal  (1/3 of daily {calorie_goal} kcal goal)
+  Protein:  ~{meal_prot_target}g     (1/3 of daily {protein_goal}g goal)
 
-💡 TIP: [One practical tip about eating at the dining hall today]
+RULES:
+- Use the search/filter tools to find REAL items available today — never invent dishes
+- Limit yourself to 2–3 tool calls maximum, then write your final answer
+- Respect ALL dietary restrictions — these are non-negotiable
+- Recommend items that TOGETHER reach the calorie and protein targets, not individually
+- Always specify the PORTION SIZE for each item (use the serving info if available, otherwise say "1 standard serving")
+- Calculate and show the COMBINED nutrition total so the student can verify it hits their goals
+- Items can be from different dining halls — tell the student where to get each one
 
-⚠️  NOTE: [Any allergy warnings or important caveats, or omit if none]"""
+RESPONSE FORMAT (use exactly this structure):
+
+🍽️ YOUR MEAL PLATE:
+─────────────────────────────
+1. [Dish name] — [portion size, e.g. "1 serving (~1 cup)"]
+   📍 [Dining Hall] · [Station]
+   Nutrition: [X] cal | [Y]g protein
+
+2. [Dish name] — [portion size]
+   📍 [Dining Hall] · [Station]
+   Nutrition: [X] cal | [Y]g protein
+
+3. [Dish name] — [portion size]  ← optional if 2 items already hit the target
+   📍 [Dining Hall] · [Station]
+   Nutrition: [X] cal | [Y]g protein
+─────────────────────────────
+📊 COMBINED: ~[total] cal | ~[total]g protein  (Goal: {meal_cal_target} cal / {meal_prot_target}g protein)
+
+💡 TIP: [One sentence of practical advice for this meal]
+
+⚠️ NOTE: [Allergy or caveat if relevant — omit section entirely if none]"""
 
     prefs_block = (
-        f"User dietary profile:\n"
-        f"  Goal:         {prefs.get('goal', 'balanced meal')}\n"
-        f"  Restrictions: {prefs.get('restrictions', 'none')}\n"
-        f"  Allergies:    {prefs.get('allergies', 'none')}\n"
-        f"  Preferences:  {prefs.get('preferences', 'no specific preference')}"
+        f"Student profile:\n"
+        f"  Daily calorie goal: {calorie_goal} kcal (target ~{meal_cal_target} kcal for this {meal})\n"
+        f"  Daily protein goal: {protein_goal}g    (target ~{meal_prot_target}g for this {meal})\n"
+        f"  Dietary restrictions: {prefs.get('restrictions', 'none')}\n"
+        f"  Allergies: {prefs.get('allergies', 'none')}\n"
+        f"  Preferences: {prefs.get('preferences', 'no specific preference')}"
     )
 
     prompt = (
         f"{prefs_block}\n\n"
-        f"Today's meal is {meal}. Use the tools to search the menu and recommend "
-        f"the best dishes for this user. Be specific and practical."
+        f"Today's meal is {meal}. Search the menu and build a meal plate "
+        f"combination that hits the targets above. Always include portion sizes."
     )
 
-    return run_agent(system, prompt, rag, all_menus, max_turns=6)
+    return run_agent(system, prompt, rag, all_menus, max_turns=8)
