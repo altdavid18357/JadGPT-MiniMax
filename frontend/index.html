@@ -137,6 +137,44 @@
     }
     .btn-primary:hover { background: var(--blue-mid); transform: translateY(-1px); box-shadow: var(--shadow-m); }
 
+    /* ── Agent log panel ────────────────────────────────────── */
+    #agent-log {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--r); margin-bottom: 1rem; overflow: hidden;
+      box-shadow: var(--shadow-s);
+    }
+    #agent-log.hidden { display: none; }
+    .log-header {
+      padding: .65rem 1rem; display: flex; align-items: center; gap: .5rem;
+      cursor: pointer; font-size: .8rem; font-weight: 600; color: var(--blue);
+      background: var(--blue-light); user-select: none;
+    }
+    .log-spinner {
+      width: 13px; height: 13px; border: 2px solid var(--border);
+      border-top-color: var(--blue); border-radius: 50%;
+      animation: spin .6s linear infinite; flex-shrink: 0;
+    }
+    .log-toggle { margin-left: auto; font-size: .7rem; transition: var(--ease); }
+    .log-toggle.open { transform: rotate(180deg); }
+    .log-steps { display: none; padding: .5rem .9rem .7rem; }
+    .log-steps.open { display: block; }
+    .log-step {
+      display: flex; align-items: baseline; gap: .5rem;
+      font-size: .76rem; padding: .28rem 0; border-bottom: 1px solid var(--border);
+    }
+    .log-step:last-child { border-bottom: none; }
+    .log-step-icon { flex-shrink: 0; font-style: normal; }
+    .log-step-name { font-weight: 700; color: var(--dark); min-width: 130px; }
+    .log-step-detail { color: var(--gray); }
+
+    /* Agent summary banner */
+    .agent-summary {
+      grid-column: 1 / -1; background: var(--blue-light);
+      border-left: 3px solid var(--blue); border-radius: 0 var(--r) var(--r) 0;
+      padding: .75rem 1rem; font-size: .84rem; line-height: 1.6; color: var(--dark);
+      margin-bottom: .25rem;
+    }
+
     /* ── Recommendation cards ───────────────────────────────── */
     #recs-section { margin-bottom: 2rem; }
     .meal-badge {
@@ -165,6 +203,11 @@
     .flag-row      { display: flex; flex-wrap: wrap; gap: .25rem; }
     .flag          { font-size: .67rem; padding: .13rem .4rem; border-radius: 5px;
                      background: var(--blue-light); color: var(--blue); font-weight: 500; }
+
+    .card-reason {
+      margin-top: .45rem; font-size: .74rem; color: var(--blue-mid);
+      font-style: italic; line-height: 1.4;
+    }
 
     #loading-msg, #error-msg {
       text-align: center; padding: 2.5rem; background: var(--white);
@@ -391,7 +434,7 @@
     </div>
   </div>
   <div class="hd-actions">
-    <button class="hd-btn" onclick="loadRecs()" title="Refresh recommendations">↻</button>
+    <button class="hd-btn" onclick="loadAgentRecs()" title="Refresh recommendations">↻</button>
     <button class="hd-btn" onclick="openOnboarding()" title="Edit preferences">⚙</button>
   </div>
 </header>
@@ -403,6 +446,16 @@
   <div id="prefs-bar">
     <div class="ptags" id="ptags"></div>
     <button class="btn-sm" onclick="openOnboarding()">Edit Preferences</button>
+  </div>
+
+  <!-- ── Agent thinking log ───────────────────────────────── -->
+  <div id="agent-log" class="hidden">
+    <div class="log-header" onclick="toggleLog()">
+      <span id="log-spinner" class="log-spinner"></span>
+      <span id="log-status">Agent is thinking…</span>
+      <span class="log-toggle" id="log-toggle">▼</span>
+    </div>
+    <div class="log-steps" id="log-steps"></div>
   </div>
 
   <!-- ── Recommendations ───────────────────────────────────── -->
@@ -522,7 +575,7 @@ function savePrefs() {
   localStorage.setItem('jadgpt_prefs', JSON.stringify(prefs));
   document.getElementById('onboarding').classList.add('hidden');
   renderPrefsBar(prefs);
-  loadRecs();
+  loadAgentRecs();
 }
 
 function openOnboarding() {
@@ -869,18 +922,33 @@ function processMessage(text) {
       break;
 
     case 'energy_low':
-      addBotMsg("Low energy? Let's fuel up! 💪\n\n" + getEnergyTip('low', prefs));
-      showMenuSuggestions('energy', prefs);
+      saveEnergyEntry('low');
+      showTyping();
+      askAgentChat(text, () => {
+        removeTyping();
+        addBotMsg("Low energy? Let's fuel up! 💪\n\n" + getEnergyTip('low', prefs));
+        showMenuSuggestions('energy', prefs);
+      });
       break;
 
     case 'energy_medium':
-      addBotMsg("Sounds balanced! Here's how to stay steady:\n\n" + getEnergyTip('medium', prefs));
-      showMenuSuggestions('balanced', prefs);
+      saveEnergyEntry('medium');
+      showTyping();
+      askAgentChat(text, () => {
+        removeTyping();
+        addBotMsg("Sounds balanced! Here's how to stay steady:\n\n" + getEnergyTip('medium', prefs));
+        showMenuSuggestions('balanced', prefs);
+      });
       break;
 
     case 'energy_high':
-      addBotMsg("You're crushing it! ⚡\n\n" + getEnergyTip('high', prefs));
-      showMenuSuggestions('light', prefs);
+      saveEnergyEntry('high');
+      showTyping();
+      askAgentChat(text, () => {
+        removeTyping();
+        addBotMsg("You're crushing it! ⚡\n\n" + getEnergyTip('high', prefs));
+        showMenuSuggestions('light', prefs);
+      });
       break;
 
     case 'feeling_sick':
@@ -967,7 +1035,7 @@ function processMessage(text) {
         const cal = parseInt(m[1]);
         updatePrefsField('calorie_goal', cal);
         addBotMsg(`Done! Calorie goal updated to ${cal} kcal/day ✅  Refreshing your recommendations…`);
-        setTimeout(loadRecs, 900);
+        setTimeout(loadAgentRecs, 900);
         renderChips(QUICK_CHIPS_DEFAULT);
       }
       break;
@@ -979,7 +1047,7 @@ function processMessage(text) {
         const prot = parseInt(m[1]);
         updatePrefsField('protein_goal', prot);
         addBotMsg(`Got it! Protein goal updated to ${prot}g/day ✅  Refreshing your recommendations…`);
-        setTimeout(loadRecs, 900);
+        setTimeout(loadAgentRecs, 900);
         renderChips(QUICK_CHIPS_DEFAULT);
       }
       break;
@@ -1005,13 +1073,21 @@ function processMessage(text) {
       break;
 
     case 'recommend':
-      addBotMsg("Here are today's top picks based on your profile:");
-      showMenuSuggestions('top', prefs);
+      showTyping();
+      askAgentChat(text, () => {
+        removeTyping();
+        addBotMsg("Here are today's top picks based on your profile:");
+        showMenuSuggestions('top', prefs);
+      });
       break;
 
     default:
-      addBotMsg("I'm not sure I caught that — but I'm here to help! Try asking about energy, meal suggestions, or updating your preferences.");
-      renderChips(QUICK_CHIPS_DEFAULT);
+      showTyping();
+      askAgentChat(text, () => {
+        removeTyping();
+        addBotMsg("I'm not sure I caught that — but I'm here to help! Try asking about energy, meal suggestions, or updating your preferences.");
+        renderChips(QUICK_CHIPS_DEFAULT);
+      });
   }
 }
 
@@ -1030,7 +1106,7 @@ function addRestriction(r) {
     localStorage.setItem('jadgpt_prefs', JSON.stringify(prefs));
     renderPrefsBar(prefs);
     addBotMsg(`"${r}" added to your restrictions ✅  Refreshing recommendations…`);
-    setTimeout(loadRecs, 900);
+    setTimeout(loadAgentRecs, 900);
   }
   renderChips(QUICK_CHIPS_DEFAULT);
 }
@@ -1041,7 +1117,7 @@ function removeRestriction(r) {
   localStorage.setItem('jadgpt_prefs', JSON.stringify(prefs));
   renderPrefsBar(prefs);
   addBotMsg(`Removed "${r}" from your restrictions ✅  Refreshing…`);
-  setTimeout(loadRecs, 900);
+  setTimeout(loadAgentRecs, 900);
   renderChips(QUICK_CHIPS_DEFAULT);
 }
 
@@ -1051,7 +1127,7 @@ function clearRestrictions() {
   localStorage.setItem('jadgpt_prefs', JSON.stringify(prefs));
   renderPrefsBar(prefs);
   addBotMsg("All dietary restrictions cleared ✅  Refreshing recommendations…");
-  setTimeout(loadRecs, 900);
+  setTimeout(loadAgentRecs, 900);
   renderChips(QUICK_CHIPS_DEFAULT);
 }
 
@@ -1115,6 +1191,186 @@ function checkAutoCheckin() {
 }
 
 /* ============================================================
+   ENERGY HISTORY
+   ============================================================ */
+const ENERGY_HISTORY_KEY = 'boolabites_energy_history';
+
+function getEnergyHistory() {
+  try { return JSON.parse(localStorage.getItem(ENERGY_HISTORY_KEY)) || []; }
+  catch { return []; }
+}
+
+function saveEnergyEntry(level) {
+  const history = getEnergyHistory();
+  history.push({ level, time: new Date().toISOString() });
+  if (history.length > 20) history.splice(0, history.length - 20);
+  localStorage.setItem(ENERGY_HISTORY_KEY, JSON.stringify(history));
+}
+
+function buildEnergyContext() {
+  const history = getEnergyHistory();
+  return history.length ? history.slice(-6) : null;
+}
+
+/* ============================================================
+   AGENT LOG UI
+   ============================================================ */
+function toggleLog() {
+  const steps  = document.getElementById('log-steps');
+  const toggle = document.getElementById('log-toggle');
+  if (!steps || !toggle) return;
+  const open = steps.classList.toggle('open');
+  toggle.classList.toggle('open', open);
+}
+
+function clearLogSteps() {
+  const el = document.getElementById('log-steps');
+  if (el) el.innerHTML = '';
+}
+
+function appendLogStep(icon, name, detail) {
+  const steps = document.getElementById('log-steps');
+  if (!steps) return;
+  const div = document.createElement('div');
+  div.className = 'log-step';
+  div.innerHTML = `<em class="log-step-icon">${icon}</em><span class="log-step-name">${esc(name)}</span><span class="log-step-detail">${esc(detail)}</span>`;
+  steps.appendChild(div);
+  steps.classList.add('open');
+  document.getElementById('log-toggle')?.classList.add('open');
+}
+
+function setLogStatus(text, spinning) {
+  const s  = document.getElementById('log-status');
+  const sp = document.getElementById('log-spinner');
+  if (s)  s.textContent = text;
+  if (sp) sp.style.display = spinning ? '' : 'none';
+}
+
+/* ============================================================
+   AGENT RECOMMENDATIONS
+   ============================================================ */
+const TOOL_ICONS = { get_menu: '🍽️', get_nutrition: '🔬', check_user_goals: '🎯', send_recommendation: '✅' };
+
+async function loadAgentRecs() {
+  const prefs = getPrefs();
+  if (!prefs) return;
+
+  const agentLog = document.getElementById('agent-log');
+  const loading  = document.getElementById('loading-msg');
+  const errMsg   = document.getElementById('error-msg');
+  const cards    = document.getElementById('cards');
+  const mealLbl  = document.getElementById('meal-label');
+
+  agentLog.classList.remove('hidden');
+  clearLogSteps();
+  setLogStatus('Agent is thinking…', true);
+  loading.classList.remove('hidden');
+  errMsg.classList.add('hidden');
+  cards.innerHTML = '';
+
+  try {
+    const res = await fetch(`${API}/agent/recommend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        restrictions:   prefs.restrictions || [],
+        calorie_goal:   prefs.calorie_goal || 2000,
+        protein_goal:   prefs.protein_goal || 50,
+        energy_history: buildEnergyContext(),
+      }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    loading.classList.add('hidden');
+
+    if (data.fallback) {
+      agentLog.classList.add('hidden');
+      loadRecs();
+      return;
+    }
+
+    if (mealLbl) mealLbl.textContent = cap(data.meal || 'Meal');
+
+    (data.tool_log || []).forEach(s =>
+      appendLogStep(TOOL_ICONS[s.tool] || '⚙️', s.tool.replace(/_/g, ' '), s.summary || '')
+    );
+    setLogStatus(`Done — ${data.tool_log?.length || 0} tools called`, false);
+
+    window._menuData = data;
+
+    if (data.summary) {
+      cards.insertAdjacentHTML('beforeend', `<div class="agent-summary">${esc(data.summary)}</div>`);
+    }
+
+    if (!data.recommendations?.length) {
+      cards.insertAdjacentHTML('beforeend', '<p style="color:var(--gray);padding:1rem">No matching items found. Try adjusting your dietary filters.</p>');
+      return;
+    }
+
+    data.recommendations.forEach(item => cards.insertAdjacentHTML('beforeend', agentCardHTML(item)));
+
+  } catch {
+    loading.classList.add('hidden');
+    agentLog.classList.add('hidden');
+    loadRecs();
+  }
+}
+
+function agentCardHTML(item) {
+  const cal    = item.calories  != null ? `<span class="npill npill-cal">${Math.round(item.calories)} cal</span>` : '<span class="npill npill-na">cal N/A</span>';
+  const prot   = item.protein_g != null ? `<span class="npill npill-pro">${item.protein_g}g protein</span>` : '';
+  const flags  = (item.dietary_flags || []).slice(0, 3).map(f => `<span class="flag">${esc(f)}</span>`).join('');
+  const reason = item.reason ? `<div class="card-reason">💡 ${esc(item.reason)}</div>` : '';
+  return `
+    <div class="meal-card">
+      <div class="card-name">${esc(item.name)}</div>
+      <div class="card-loc">📍 ${esc(item.dining_hall)} &middot; ${esc(item.station)}</div>
+      <div class="nut-row">${cal}${prot}</div>
+      ${flags ? `<div class="flag-row">${flags}</div>` : ''}
+      ${reason}
+    </div>`;
+}
+
+/* ── Agent chat ──────────────────────────────────────────────── */
+async function askAgentChat(text, fallbackFn) {
+  const prefs = getPrefs() || { restrictions: [], calorie_goal: 2000, protein_goal: 50 };
+  try {
+    const res = await fetch(`${API}/agent/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message:        text,
+        restrictions:   prefs.restrictions || [],
+        calorie_goal:   prefs.calorie_goal || 2000,
+        protein_goal:   prefs.protein_goal || 50,
+        energy_history: buildEnergyContext(),
+      }),
+    });
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    removeTyping();
+    if (data.fallback || !data.reply) { fallbackFn?.(); return; }
+    if (data.tool_log?.length) {
+      const stepsHtml = data.tool_log.map(s =>
+        `<div style="font-size:.68rem;color:var(--gray);padding:.08rem 0">${TOOL_ICONS[s.tool] || '⚙️'} <b>${s.tool.replace(/_/g, ' ')}</b>: ${esc(s.summary || '')}</div>`
+      ).join('');
+      addBotMsg(
+        `<div style="border-left:2px solid var(--border);padding-left:.6rem;margin-bottom:.4rem;opacity:.85">${stepsHtml}</div>` +
+        esc(data.reply).replace(/\n/g, '<br>'),
+        true
+      );
+    } else {
+      addBotMsg(data.reply);
+    }
+    renderChips(QUICK_CHIPS_DEFAULT);
+  } catch {
+    removeTyping();
+    fallbackFn?.();
+  }
+}
+
+/* ============================================================
    UTILITIES
    ============================================================ */
 function esc(s) {
@@ -1134,7 +1390,7 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     document.getElementById('onboarding').classList.add('hidden');
     renderPrefsBar(prefs);
-    loadRecs();
+    loadAgentRecs();
   }
 
   initMap();
