@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>JadGPT — Yale Dining Recommender</title>
+  <title>BoolaBites — Yale Dining Recommender</title>
   <style>
     /* ── Variables ──────────────────────────────────────────── */
     :root {
@@ -229,46 +229,93 @@
     @keyframes pulse { 0%,100%{transform:scale(1)}50%{transform:scale(1.3)} }
 
     .chat-panel {
-      position: absolute; bottom: 66px; right: 0; width: 300px;
+      position: absolute; bottom: 66px; right: 0; width: 330px;
       background: var(--white); border-radius: 16px; box-shadow: var(--shadow-l);
-      overflow: hidden; display: none;
-      animation: chatPop .18s ease;
-      transform-origin: bottom right;
+      display: none; flex-direction: column; max-height: 500px;
+      animation: chatPop .18s ease; transform-origin: bottom right;
     }
-    .chat-panel.open { display: block; }
+    .chat-panel.open { display: flex; }
     @keyframes chatPop { from{transform:scale(.85);opacity:0} to{transform:scale(1);opacity:1} }
+
     .chat-head {
-      background: var(--blue); color: #fff; padding: .8rem 1rem;
-      display: flex; align-items: center; gap: .55rem;
+      background: var(--blue); color: #fff; padding: .75rem 1rem;
+      display: flex; align-items: center; gap: .55rem; flex-shrink: 0;
+      border-radius: 16px 16px 0 0;
     }
     .chat-avatar {
-      width: 32px; height: 32px; background: rgba(255,255,255,.18);
-      border-radius: 50%; display: grid; place-items: center; font-size: 1rem; flex-shrink: 0;
+      width: 34px; height: 34px; background: rgba(255,255,255,.18);
+      border-radius: 50%; display: grid; place-items: center; font-size: 1.1rem; flex-shrink: 0;
     }
-    .chat-head h3 { font-size: .85rem; font-weight: 700; flex: 1; }
-    .chat-close   { background: none; border: none; color: #fff; font-size: .95rem; cursor: pointer; opacity: .8; }
-    .chat-body    { padding: 1rem; }
-    .chat-msg {
-      background: var(--bg); border-radius: 10px 10px 10px 3px;
-      padding: .7rem .9rem; font-size: .83rem; line-height: 1.5;
-      margin-bottom: .75rem; color: var(--dark);
+    .chat-head-info { flex: 1; }
+    .chat-head h3   { font-size: .85rem; font-weight: 700; line-height: 1.2; }
+    .chat-status    { font-size: .67rem; opacity: .72; }
+    .chat-close     { background: none; border: none; color: #fff; font-size: .95rem; cursor: pointer; opacity: .75; padding: .2rem; }
+    .chat-close:hover { opacity: 1; }
+
+    /* Messages */
+    .chat-messages {
+      flex: 1; overflow-y: auto; padding: .85rem 1rem;
+      display: flex; flex-direction: column; gap: .5rem;
+      scroll-behavior: smooth; min-height: 180px;
     }
-    .energy-btns { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .45rem; margin-bottom: .75rem; }
-    .e-btn {
-      padding: .55rem .3rem; border: 2px solid var(--border); border-radius: 8px;
-      background: #fff; font-size: .78rem; font-weight: 600; cursor: pointer;
-      transition: var(--ease); text-align: center;
+    .chat-messages::-webkit-scrollbar { width: 3px; }
+    .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .msg            { display: flex; flex-direction: column; max-width: 90%; }
+    .msg-bot        { align-self: flex-start; }
+    .msg-user       { align-self: flex-end; align-items: flex-end; }
+    .msg-bubble     { padding: .6rem .85rem; border-radius: 12px; font-size: .82rem; line-height: 1.5; }
+    .msg-bot  .msg-bubble { background: var(--bg); color: var(--dark); border-radius: 3px 12px 12px 12px; }
+    .msg-user .msg-bubble { background: var(--blue); color: #fff; border-radius: 12px 12px 3px 12px; }
+    .msg-time { font-size: .62rem; color: var(--gray); margin-top: .18rem; padding: 0 .15rem; }
+
+    /* Typing indicator */
+    .typing-dots { display: flex; align-items: center; gap: 4px; padding: .25rem .1rem; }
+    .tdot {
+      width: 7px; height: 7px; background: var(--gray); border-radius: 50%;
+      animation: tdot .9s ease-in-out infinite;
     }
-    .e-btn:hover { border-color: var(--blue); }
-    .e-btn.sel-low    { background:#FEF3C7; border-color:#D97706; color:#92400E; }
-    .e-btn.sel-medium { background:#D1FAE5; border-color:#059669; color:#065F46; }
-    .e-btn.sel-high   { background:#DBEAFE; border-color:#2563EB; color:#1E40AF; }
-    .chat-tip {
-      background: var(--blue-light); border-left: 3px solid var(--blue);
-      border-radius: 0 8px 8px 0; padding: .6rem .8rem;
-      font-size: .79rem; line-height: 1.5; color: var(--dark); display: none;
+    .tdot:nth-child(2) { animation-delay: .15s; }
+    .tdot:nth-child(3) { animation-delay: .3s; }
+    @keyframes tdot { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-5px)} }
+
+    /* Quick chips */
+    .quick-chips {
+      display: flex; flex-wrap: wrap; gap: .32rem;
+      padding: .5rem .9rem; border-top: 1px solid var(--border); flex-shrink: 0;
     }
-    .chat-tip.show { display: block; }
+    .chip {
+      font-size: .71rem; font-weight: 600; padding: .25rem .6rem;
+      border-radius: 20px; border: 1.5px solid var(--blue);
+      background: var(--white); color: var(--blue); cursor: pointer;
+      transition: var(--ease); white-space: nowrap;
+    }
+    .chip:hover { background: var(--blue); color: #fff; }
+
+    /* Inline suggested items */
+    .chat-item-row {
+      padding: .28rem 0; border-bottom: 1px solid var(--border); font-size: .79rem;
+    }
+    .chat-item-row:last-child { border-bottom: none; }
+
+    /* Input row */
+    .chat-input-row {
+      display: flex; gap: .4rem; padding: .6rem .9rem;
+      border-top: 1px solid var(--border); flex-shrink: 0; align-items: center;
+    }
+    .chat-input {
+      flex: 1; border: 1.5px solid var(--border); border-radius: 20px;
+      padding: .42rem .8rem; font-size: .82rem; outline: none;
+      transition: var(--ease); background: var(--bg); color: var(--dark);
+    }
+    .chat-input:focus { border-color: var(--blue); background: #fff; }
+    .chat-send {
+      width: 30px; height: 30px; border-radius: 50%; background: var(--blue);
+      border: none; color: #fff; font-size: .85rem; cursor: pointer;
+      display: grid; place-items: center; transition: var(--ease); flex-shrink: 0;
+    }
+    .chat-send:hover { background: var(--blue-mid); }
+    .chat-send:disabled { background: var(--border); cursor: default; }
 
     /* ── Utilities ───────────────────────────────────────────── */
     .hidden { display: none !important; }
@@ -290,7 +337,7 @@
     <div class="ob-logo-row">
       <div class="ob-badge">🍽️</div>
       <div>
-        <h2>JadGPT</h2>
+        <h2>BoolaBites</h2>
         <p>Your personal Yale dining assistant</p>
       </div>
     </div>
@@ -339,7 +386,7 @@
   <div class="hd-logo">
     <div class="hd-icon">🍽️</div>
     <div>
-      <div class="hd-title">JadGPT</div>
+      <div class="hd-title">BoolaBites</div>
       <div class="hd-sub">Yale Dining Recommender</div>
     </div>
   </div>
@@ -390,17 +437,25 @@
 
 <!-- ── Chat FAB ───────────────────────────────────────────── -->
 <div id="chat-fab">
-  <button class="chat-trigger" id="chat-btn" onclick="toggleChat()" title="Energy Check-in">
+  <button class="chat-trigger" id="chat-btn" onclick="toggleChat()" title="Chat with Boo">
     💬
     <span class="chat-dot hidden" id="chat-dot"></span>
   </button>
   <div class="chat-panel" id="chat-panel">
     <div class="chat-head">
-      <div class="chat-avatar">🤖</div>
-      <h3>Jad — Energy Check-in</h3>
+      <div class="chat-avatar">🐻</div>
+      <div class="chat-head-info">
+        <h3>Boo</h3>
+        <div class="chat-status">Yale dining assistant</div>
+      </div>
       <button class="chat-close" onclick="toggleChat()">✕</button>
     </div>
-    <div class="chat-body" id="chat-body"></div>
+    <div class="chat-messages" id="chat-messages"></div>
+    <div class="quick-chips" id="quick-chips"></div>
+    <div class="chat-input-row">
+      <input class="chat-input" id="chat-input" type="text" placeholder="How are you feeling today?" />
+      <button class="chat-send" onclick="sendUserMessage()">↑</button>
+    </div>
   </div>
 </div>
 
@@ -632,62 +687,430 @@ async function fetchHallPreview(hall, el) {
 }
 
 /* ============================================================
-   CHATBOT / ENERGY CHECK-IN
+   CHATBOT
    ============================================================ */
-let chatOpen = false;
+let chatOpen       = false;
+let chatHistory    = [];   // {role:'bot'|'user', text}
 let lastCheckinKey = null;
 
+const QUICK_CHIPS_DEFAULT = [
+  { label: '⚡ Energy check-in',    fn: () => userSays('Energy check-in') },
+  { label: '🥗 Update restrictions', fn: () => userSays('Update my restrictions') },
+  { label: '🎯 Calorie goal',        fn: () => userSays('Update calorie goal') },
+  { label: '💪 Protein goal',        fn: () => userSays('Update protein goal') },
+  { label: "🍽️ What's good today?",  fn: () => userSays("What's good to eat today?") },
+];
+
+// ── Open / close ─────────────────────────────────────────────
 function toggleChat() {
   chatOpen = !chatOpen;
-  const panel = document.getElementById('chat-panel');
-  panel.classList.toggle('open', chatOpen);
+  document.getElementById('chat-panel').classList.toggle('open', chatOpen);
   if (chatOpen) {
     document.getElementById('chat-dot').classList.add('hidden');
-    renderCheckin();
+    // Flush any queued auto check-in messages
+    const queued = chatHistory.filter(m => m._queued);
+    chatHistory = chatHistory.filter(m => !m._queued);
+    if (chatHistory.length === 0) {
+      initChat();
+    } else {
+      scrollMsgs();
+    }
+    queued.forEach(m => { addBotMsg(m.text); });
+    if (queued.length) {
+      renderChips([
+        { label: '😴 Low',    fn: () => userSays('I have low energy') },
+        { label: '😊 Medium', fn: () => userSays("I'm doing okay") },
+        { label: '⚡ High',   fn: () => userSays('I have high energy') },
+      ]);
+    }
   }
 }
 
-function renderCheckin() {
-  const body = document.getElementById('chat-body');
-  const h = new Date().getHours();
+function initChat() {
+  const h   = new Date().getHours();
   const ctx = h < 11 ? 'breakfast' : h < 15 ? 'lunch' : 'dinner';
-  body.innerHTML = `
-    <div class="chat-msg">Hey! It's ${ctx} time 🍴<br>How are your energy levels right now?</div>
-    <div class="energy-btns">
-      <button class="e-btn" onclick="pickEnergy('low',  this)">😴 Low</button>
-      <button class="e-btn" onclick="pickEnergy('medium',this)">😊 Medium</button>
-      <button class="e-btn" onclick="pickEnergy('high', this)">⚡ High</button>
-    </div>
-    <div class="chat-tip" id="chat-tip"></div>`;
+  addBotMsg(`Hey! I'm Boo 🐻 — your Yale dining assistant. It's ${ctx} time! Tell me how you're feeling, or ask me anything about today's menu.`);
+  renderChips(QUICK_CHIPS_DEFAULT);
 }
 
-function pickEnergy(level, btn) {
-  document.querySelectorAll('.e-btn').forEach(b => b.className = 'e-btn');
-  btn.classList.add(`sel-${level}`);
-
-  const prefs = getPrefs();
-  const tips  = ENERGY_TIPS[level];
-  const r     = prefs?.restrictions || [];
-
-  let tip = tips.default;
-  if      (r.includes('vegan'))        tip = tips.vegan;
-  else if (r.includes('vegetarian'))   tip = tips.vegetarian;
-  else if (r.includes('halal'))        tip = tips.halal;
-  else if (r.includes('gluten-free'))  tip = tips['gluten-free'];
-
-  const tipEl = document.getElementById('chat-tip');
-  tipEl.innerHTML = `<strong>${cap(level)} energy:</strong><br>${esc(tip)}`;
-  tipEl.classList.add('show');
+// ── Message rendering ────────────────────────────────────────
+function scrollMsgs() {
+  const el = document.getElementById('chat-messages');
+  if (el) setTimeout(() => { el.scrollTop = el.scrollHeight; }, 40);
 }
 
+function nowTime() {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function addBotMsg(text, isHTML = false) {
+  chatHistory.push({ role: 'bot', text });
+  const el = document.getElementById('chat-messages');
+  if (!el) return;
+  const div = document.createElement('div');
+  div.className = 'msg msg-bot';
+  div.innerHTML = `<div class="msg-bubble">${isHTML ? text : esc(text).replace(/\n/g, '<br>')}</div>
+                   <span class="msg-time">${nowTime()}</span>`;
+  el.appendChild(div);
+  scrollMsgs();
+}
+
+function addUserMsg(text) {
+  chatHistory.push({ role: 'user', text });
+  const el = document.getElementById('chat-messages');
+  if (!el) return;
+  const div = document.createElement('div');
+  div.className = 'msg msg-user';
+  div.innerHTML = `<div class="msg-bubble">${esc(text)}</div>
+                   <span class="msg-time">${nowTime()}</span>`;
+  el.appendChild(div);
+  scrollMsgs();
+}
+
+function showTyping() {
+  const el = document.getElementById('chat-messages');
+  if (!el) return;
+  const div = document.createElement('div');
+  div.className = 'msg msg-bot'; div.id = 'typing-indicator';
+  div.innerHTML = `<div class="msg-bubble"><div class="typing-dots">
+    <div class="tdot"></div><div class="tdot"></div><div class="tdot"></div>
+  </div></div>`;
+  el.appendChild(div);
+  scrollMsgs();
+}
+function removeTyping() { document.getElementById('typing-indicator')?.remove(); }
+
+function renderChips(chips) {
+  const el = document.getElementById('quick-chips');
+  if (!el) return;
+  el.innerHTML = '';
+  chips.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.textContent = c.label;
+    b.onclick = c.fn;
+    el.appendChild(b);
+  });
+}
+function clearChips() { const el = document.getElementById('quick-chips'); if (el) el.innerHTML = ''; }
+
+// ── User sends a message ─────────────────────────────────────
+function sendUserMessage() {
+  const input = document.getElementById('chat-input');
+  const text  = input?.value?.trim();
+  if (!text) return;
+  input.value = '';
+  userSays(text);
+}
+
+function userSays(text) {
+  addUserMsg(text);
+  clearChips();
+  showTyping();
+  setTimeout(() => { removeTyping(); processMessage(text); }, 500 + Math.random() * 350);
+}
+
+// ── Intent detection ─────────────────────────────────────────
+function detectIntent(msg) {
+  const m = msg.toLowerCase();
+  if (/\b(hi|hello|hey|hiya|sup|yo)\b/.test(m))                                               return 'greeting';
+  if (/\b(help|what can you do|capabilities|commands)\b/.test(m))                             return 'help';
+  if (/\b(tired|exhausted|low energy|no energy|sleepy|drained|fatigued|sluggish)\b/.test(m)) return 'energy_low';
+  if (/\b(high energy|energized|pumped|great|amazing|fantastic|feel good|on fire)\b/.test(m)) return 'energy_high';
+  if (/\b(medium|okay|ok|fine|alright|not bad|so.so|meh|average|neutral)\b/.test(m))         return 'energy_medium';
+  if (/\b(sick|nausea|stomach|not.*well|under the weather|headache|queasy|ill)\b/.test(m))   return 'feeling_sick';
+  if (/\b(stress|anxious|overwhelm|nervous|worry|worried|panic|pressure)\b/.test(m))         return 'feeling_stressed';
+  if (/\b(workout|gym|exercise|ran|run|lifting|weights|training|crossfit)\b/.test(m))        return 'post_workout';
+  if (/\b(starving|famished|ravenous|very hungry|super hungry|dying of hunger)\b/.test(m))   return 'very_hungry';
+  if (/\b(not hungry|not that hungry|small meal|snack|light meal|just a bite)\b/.test(m))    return 'not_hungry';
+  if (/\b(celebrat|happy|excited|good mood|treat yourself|deserv)\b/.test(m))                return 'celebrating';
+  if (/\b(sad|down|blue|depressed|unhappy|lonely|rough day)\b/.test(m))                      return 'feeling_down';
+  if (/\b(remove|no longer|can eat|stop being|not (vegan|vegetarian|halal|gluten.free))\b/.test(m)) return 'remove_restriction';
+  if (/\b(vegan|vegetarian|gluten.free|halal)\b/.test(m))                                    return 'update_restriction';
+  if (/\b(\d{3,4})\s*(cal|calorie|kcal)/.test(m))                                            return 'update_calories';
+  if (/\b(\d{2,3})\s*g?\s*(protein|grams of protein)/.test(m))                              return 'update_protein';
+  if (/\bupdate.*(calorie|caloric|calories)\b/.test(m))                                      return 'ask_calories';
+  if (/\bupdate.*protein\b/.test(m))                                                          return 'ask_protein';
+  if (/\bupdate.*(restriction|diet|dietary)\b/.test(m))                                      return 'ask_restriction';
+  if (/\b(energy check.?in|check.?in)\b/.test(m))                                            return 'energy_checkin';
+  if (/\b(what.*good|suggest|recommend|best.*today|what.*eat|what.*have|meal.*today)\b/.test(m)) return 'recommend';
+  return 'unknown';
+}
+
+// ── Response generation ──────────────────────────────────────
+function processMessage(text) {
+  const prefs  = getPrefs() || { restrictions: [], calorie_goal: 2000, protein_goal: 50 };
+  const intent = detectIntent(text);
+
+  switch (intent) {
+    case 'greeting':
+      addBotMsg("Hey! Great to hear from you. I can help with energy check-ins, meal suggestions, or updating your preferences. What's on your mind?");
+      renderChips(QUICK_CHIPS_DEFAULT);
+      break;
+
+    case 'help':
+      addBotMsg(
+        "Here's what I can do:\n" +
+        "• ⚡ Energy check-in — tell me how you feel\n" +
+        "• 🍽️ Meal suggestions — ask what's good today\n" +
+        "• 🥗 Dietary restrictions — add/remove vegan, halal, etc.\n" +
+        "• 🎯 Calorie & protein goals — just say the number\n" +
+        "• 😴 Mood-based meals — tired, stressed, post-workout?"
+      );
+      renderChips(QUICK_CHIPS_DEFAULT);
+      break;
+
+    case 'energy_checkin':
+      addBotMsg("How are your energy levels right now?");
+      renderChips([
+        { label: '😴 Low',    fn: () => userSays('I have low energy') },
+        { label: '😊 Medium', fn: () => userSays("I'm doing okay") },
+        { label: '⚡ High',   fn: () => userSays('I have high energy') },
+      ]);
+      break;
+
+    case 'energy_low':
+      addBotMsg("Low energy? Let's fuel up! 💪\n\n" + getEnergyTip('low', prefs));
+      showMenuSuggestions('energy', prefs);
+      break;
+
+    case 'energy_medium':
+      addBotMsg("Sounds balanced! Here's how to stay steady:\n\n" + getEnergyTip('medium', prefs));
+      showMenuSuggestions('balanced', prefs);
+      break;
+
+    case 'energy_high':
+      addBotMsg("You're crushing it! ⚡\n\n" + getEnergyTip('high', prefs));
+      showMenuSuggestions('light', prefs);
+      break;
+
+    case 'feeling_sick':
+      addBotMsg("Sorry you're not feeling well 🤒 Gentle options are best: plain rice, broth soups, toast, or bananas. Avoid anything fried or spicy. Stay hydrated!");
+      renderChips([{ label: '🍵 Soups available today', fn: () => userSays('What soups are available today?') }]);
+      break;
+
+    case 'feeling_stressed':
+      addBotMsg("Exam season is brutal 📚 Foods that genuinely help with stress: oats, dark chocolate, nuts, and leafy greens. Avoid excess caffeine — it amplifies anxiety. A balanced meal will help you focus.");
+      showMenuSuggestions('balanced', prefs);
+      break;
+
+    case 'post_workout':
+      addBotMsg("Nice work! 💪 Aim for protein + carbs within 45 min post-workout — ideally 25–40g protein with complex carbs to aid muscle recovery.");
+      showMenuSuggestions('high_protein', prefs);
+      break;
+
+    case 'very_hungry':
+      addBotMsg("Hungry Yale student alert! 🍽️ Here are today's most filling options:");
+      showMenuSuggestions('filling', prefs);
+      break;
+
+    case 'not_hungry':
+      addBotMsg("No problem — here are some lighter picks from today's menu:");
+      showMenuSuggestions('light', prefs);
+      break;
+
+    case 'celebrating':
+      addBotMsg("Something to celebrate?! 🎉 You deserve a treat. Life's too short not to enjoy dining hall dessert occasionally. Here are some feel-good picks:");
+      showMenuSuggestions('popular', prefs);
+      break;
+
+    case 'feeling_down':
+      addBotMsg("Sending good vibes 💙 Sometimes comfort food is exactly what's needed. Here are some hearty, feel-good options:");
+      showMenuSuggestions('comfort', prefs);
+      break;
+
+    case 'update_restriction': {
+      const found = text.match(/\b(vegan|vegetarian|gluten.free|gluten free|halal)\b/i);
+      if (found) {
+        const r = found[0].toLowerCase().replace(/\s+/g, '-');
+        const current = prefs.restrictions || [];
+        if (current.includes(r)) {
+          addBotMsg(`"${r}" is already in your preferences. Want to remove it instead?`);
+          renderChips([
+            { label: `Remove ${r}`, fn: () => removeRestriction(r) },
+            { label: 'Keep it',     fn: () => { addBotMsg("Okay, keeping it!"); renderChips(QUICK_CHIPS_DEFAULT); } },
+          ]);
+        } else {
+          addRestriction(r);
+        }
+      } else {
+        addBotMsg("Which restriction would you like to add?");
+        renderChips([
+          { label: '🌱 Vegan',       fn: () => addRestriction('vegan') },
+          { label: '🥦 Vegetarian',  fn: () => addRestriction('vegetarian') },
+          { label: '🌾 Gluten-Free', fn: () => addRestriction('gluten-free') },
+          { label: '☪️ Halal',        fn: () => addRestriction('halal') },
+        ]);
+      }
+      break;
+    }
+
+    case 'remove_restriction': {
+      const found = text.match(/\b(vegan|vegetarian|gluten.free|gluten free|halal)\b/i);
+      if (found) {
+        removeRestriction(found[0].toLowerCase().replace(/\s+/g, '-'));
+      } else {
+        const current = prefs.restrictions || [];
+        if (!current.length) {
+          addBotMsg("You don't have any restrictions set right now.");
+          renderChips(QUICK_CHIPS_DEFAULT);
+        } else {
+          addBotMsg("Which restriction would you like to remove?");
+          renderChips(current.map(r => ({ label: `Remove ${r}`, fn: () => removeRestriction(r) })));
+        }
+      }
+      break;
+    }
+
+    case 'update_calories': {
+      const m = text.match(/\b(\d{3,4})\s*(cal|calorie|kcal)/i);
+      if (m) {
+        const cal = parseInt(m[1]);
+        updatePrefsField('calorie_goal', cal);
+        addBotMsg(`Done! Calorie goal updated to ${cal} kcal/day ✅  Refreshing your recommendations…`);
+        setTimeout(loadRecs, 900);
+        renderChips(QUICK_CHIPS_DEFAULT);
+      }
+      break;
+    }
+
+    case 'update_protein': {
+      const m = text.match(/\b(\d{2,3})\s*g?\s*(protein|grams)/i);
+      if (m) {
+        const prot = parseInt(m[1]);
+        updatePrefsField('protein_goal', prot);
+        addBotMsg(`Got it! Protein goal updated to ${prot}g/day ✅  Refreshing your recommendations…`);
+        setTimeout(loadRecs, 900);
+        renderChips(QUICK_CHIPS_DEFAULT);
+      }
+      break;
+    }
+
+    case 'ask_calories':
+      addBotMsg("What would you like your daily calorie goal to be? (e.g. type \"1800 calories\")");
+      break;
+
+    case 'ask_protein':
+      addBotMsg("What's your protein goal in grams? (e.g. type \"120g protein\")");
+      break;
+
+    case 'ask_restriction':
+      addBotMsg("What would you like to change?");
+      renderChips([
+        { label: '🌱 Add Vegan',        fn: () => addRestriction('vegan') },
+        { label: '🥦 Add Vegetarian',   fn: () => addRestriction('vegetarian') },
+        { label: '🌾 Add Gluten-Free',  fn: () => addRestriction('gluten-free') },
+        { label: '☪️ Add Halal',         fn: () => addRestriction('halal') },
+        { label: '🚫 Clear all',         fn: () => clearRestrictions() },
+      ]);
+      break;
+
+    case 'recommend':
+      addBotMsg("Here are today's top picks based on your profile:");
+      showMenuSuggestions('top', prefs);
+      break;
+
+    default:
+      addBotMsg("I'm not sure I caught that — but I'm here to help! Try asking about energy, meal suggestions, or updating your preferences.");
+      renderChips(QUICK_CHIPS_DEFAULT);
+  }
+}
+
+// ── Preference helpers ────────────────────────────────────────
+function updatePrefsField(key, value) {
+  const prefs = getPrefs() || { restrictions: [], calorie_goal: 2000, protein_goal: 50 };
+  prefs[key] = value;
+  localStorage.setItem('jadgpt_prefs', JSON.stringify(prefs));
+  renderPrefsBar(prefs);
+}
+
+function addRestriction(r) {
+  const prefs = getPrefs() || { restrictions: [], calorie_goal: 2000, protein_goal: 50 };
+  if (!prefs.restrictions.includes(r)) {
+    prefs.restrictions.push(r);
+    localStorage.setItem('jadgpt_prefs', JSON.stringify(prefs));
+    renderPrefsBar(prefs);
+    addBotMsg(`"${r}" added to your restrictions ✅  Refreshing recommendations…`);
+    setTimeout(loadRecs, 900);
+  }
+  renderChips(QUICK_CHIPS_DEFAULT);
+}
+
+function removeRestriction(r) {
+  const prefs = getPrefs() || { restrictions: [], calorie_goal: 2000, protein_goal: 50 };
+  prefs.restrictions = prefs.restrictions.filter(x => x !== r);
+  localStorage.setItem('jadgpt_prefs', JSON.stringify(prefs));
+  renderPrefsBar(prefs);
+  addBotMsg(`Removed "${r}" from your restrictions ✅  Refreshing…`);
+  setTimeout(loadRecs, 900);
+  renderChips(QUICK_CHIPS_DEFAULT);
+}
+
+function clearRestrictions() {
+  const prefs = getPrefs() || { restrictions: [], calorie_goal: 2000, protein_goal: 50 };
+  prefs.restrictions = [];
+  localStorage.setItem('jadgpt_prefs', JSON.stringify(prefs));
+  renderPrefsBar(prefs);
+  addBotMsg("All dietary restrictions cleared ✅  Refreshing recommendations…");
+  setTimeout(loadRecs, 900);
+  renderChips(QUICK_CHIPS_DEFAULT);
+}
+
+// ── Inline menu suggestions ───────────────────────────────────
+function showMenuSuggestions(mode, prefs) {
+  let items = [...(window._menuData?.recommendations || [])];
+
+  if      (mode === 'high_protein') items = items.filter(x => (x.protein_g || 0) >= 15).sort((a,b) => (b.protein_g||0)-(a.protein_g||0));
+  else if (mode === 'light')        items = items.filter(x => x.calories && x.calories < 320).sort((a,b) => (a.calories||999)-(b.calories||999));
+  else if (mode === 'filling')      items = items.filter(x => x.calories && x.calories >= 400).sort((a,b) => (b.calories||0)-(a.calories||0));
+  else if (mode === 'energy')       items = items.filter(x => (x.protein_g||0) >= 8 && (x.calories||0) >= 200).sort((a,b) => (b.protein_g||0)-(a.protein_g||0));
+  else                              items = items.sort((a,b) => (b.protein_g||0)-(a.protein_g||0));
+
+  const top = items.slice(0, 3);
+  if (!top.length) {
+    addBotMsg("I don't have today's menu cached yet — check the Recommendations section above after it loads!");
+    renderChips(QUICK_CHIPS_DEFAULT);
+    return;
+  }
+
+  const html = top.map(item => {
+    const cal  = item.calories  ? `${Math.round(item.calories)} cal` : '';
+    const prot = item.protein_g ? `${item.protein_g}g protein` : '';
+    const stats = [cal, prot].filter(Boolean).join(' · ');
+    return `<div class="chat-item-row">
+      <strong>${esc(item.name)}</strong><br>
+      <span style="font-size:.71rem;color:var(--gray)">${esc(item.dining_hall)} — ${stats}</span>
+    </div>`;
+  }).join('');
+  addBotMsg(html, true);
+  renderChips(QUICK_CHIPS_DEFAULT);
+}
+
+// ── Energy tips (reused from existing data) ───────────────────
+function getEnergyTip(level, prefs) {
+  const tips = ENERGY_TIPS[level];
+  const r    = prefs?.restrictions || [];
+  if (r.includes('vegan'))        return tips.vegan;
+  if (r.includes('vegetarian'))   return tips.vegetarian;
+  if (r.includes('halal'))        return tips.halal;
+  if (r.includes('gluten-free'))  return tips['gluten-free'];
+  return tips.default;
+}
+
+// ── Auto check-in notification ────────────────────────────────
 function checkAutoCheckin() {
-  const now  = new Date();
-  const h    = now.getHours();
-  const m    = now.getMinutes();
-  const key  = `${now.toDateString()}-${h}`;
+  const now = new Date();
+  const h   = now.getHours();
+  const m   = now.getMinutes();
+  const key = `${now.toDateString()}-${h}`;
   if (CHECKIN_HOURS.includes(h) && m < 5 && key !== lastCheckinKey) {
     lastCheckinKey = key;
-    if (!chatOpen) document.getElementById('chat-dot').classList.remove('hidden');
+    if (!chatOpen) {
+      document.getElementById('chat-dot').classList.remove('hidden');
+      // Queue a check-in message for when the user opens the chat
+      const ctx = h < 11 ? 'breakfast' : h < 15 ? 'lunch' : 'dinner';
+      chatHistory.push({ role: 'bot', _queued: true,
+        text: `It's ${ctx} time! ⏰ How are your energy levels today?` });
+    }
   }
 }
 
@@ -717,6 +1140,11 @@ document.addEventListener('DOMContentLoaded', () => {
   initMap();
   setInterval(checkAutoCheckin, 60_000);
   checkAutoCheckin();
+
+  // Enter key in chat input
+  document.getElementById('chat-input')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') sendUserMessage();
+  });
 });
 </script>
 </body>
