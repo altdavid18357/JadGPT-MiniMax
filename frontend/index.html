@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JadGPT — Yale Dining Recommender</title>
+  <style>
+    /* ── Variables ──────────────────────────────────────────── */
+    :root {
+      --blue:       #00356B;
+      --blue-mid:   #286DC0;
+      --blue-light: #EBF2FA;
+      --white:      #FFFFFF;
+      --bg:         #F4F6F9;
+      --border:     #DDE3EC;
+      --gray:       #6B7280;
+      --dark:       #1F2937;
+      --cal-bg:     #FEF3C7;
+      --cal-fg:     #92400E;
+      --pro-bg:     #D1FAE5;
+      --pro-fg:     #065F46;
+      --red:        #DC2626;
+      --shadow-s:   0 1px 3px rgba(0,0,0,.08);
+      --shadow-m:   0 4px 14px rgba(0,0,0,.10);
+      --shadow-l:   0 10px 30px rgba(0,0,0,.14);
+      --r:          12px;
+      --ease:       0.18s ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+           background: var(--bg); color: var(--dark); min-height: 100vh; }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    header {
+      background: var(--blue); color: var(--white);
+      padding: .85rem 1.4rem;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 200;
+      box-shadow: 0 2px 10px rgba(0,0,0,.22);
+    }
+    .hd-logo { display: flex; align-items: center; gap: .7rem; }
+    .hd-icon {
+      width: 38px; height: 38px; background: rgba(255,255,255,.15);
+      border-radius: 9px; display: grid; place-items: center; font-size: 1.25rem;
+    }
+    .hd-title { font-size: 1.15rem; font-weight: 800; letter-spacing: -.3px; }
+    .hd-sub   { font-size: .72rem; opacity: .75; margin-top: 1px; }
+    .hd-actions { display: flex; gap: .45rem; }
+    .hd-btn {
+      background: rgba(255,255,255,.13); border: none; color: #fff;
+      width: 36px; height: 36px; border-radius: 8px; cursor: pointer;
+      font-size: 1rem; display: grid; place-items: center; transition: var(--ease);
+    }
+    .hd-btn:hover { background: rgba(255,255,255,.25); }
+
+    /* ── Main layout ─────────────────────────────────────────── */
+    main { max-width: 1080px; margin: 0 auto; padding: 1.4rem; }
+
+    /* ── Section headings ──────────────────────────────────── */
+    .sec-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: .9rem;
+    }
+    .sec-title {
+      font-size: 1.05rem; font-weight: 700; color: var(--blue);
+      display: flex; align-items: center; gap: .4rem;
+    }
+
+    /* ── Prefs bar ──────────────────────────────────────────── */
+    #prefs-bar {
+      background: var(--white); border-radius: var(--r);
+      padding: .75rem 1.1rem; margin-bottom: 1.3rem;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: .5rem; box-shadow: var(--shadow-s);
+      border: 1px solid var(--border);
+    }
+    .ptags { display: flex; flex-wrap: wrap; gap: .4rem; }
+    .ptag {
+      font-size: .72rem; font-weight: 600; padding: .22rem .6rem;
+      border-radius: 20px; background: var(--blue-light); color: var(--blue);
+    }
+    .btn-sm {
+      font-size: .75rem; font-weight: 600; padding: .28rem .7rem;
+      border-radius: 20px; border: 1.5px solid var(--blue);
+      background: transparent; color: var(--blue); cursor: pointer; transition: var(--ease);
+    }
+    .btn-sm:hover { background: var(--blue); color: #fff; }
+
+    /* ── Onboarding overlay ─────────────────────────────────── */
+    #onboarding {
+      position: fixed; inset: 0; z-index: 900;
+      background: rgba(0,35,80,.82); backdrop-filter: blur(5px);
+      display: flex; align-items: center; justify-content: center; padding: 1rem;
+    }
+    #onboarding.hidden { display: none; }
+    .ob-card {
+      background: var(--white); border-radius: 20px; padding: 2rem 2.1rem;
+      max-width: 460px; width: 100%; box-shadow: var(--shadow-l);
+    }
+    .ob-logo-row { display: flex; align-items: center; gap: .8rem; margin-bottom: 1.6rem; }
+    .ob-badge {
+      width: 50px; height: 50px; background: var(--blue); border-radius: 13px;
+      display: grid; place-items: center; font-size: 1.6rem; color: #fff;
+      flex-shrink: 0;
+    }
+    .ob-card h2  { font-size: 1.45rem; font-weight: 800; color: var(--blue); }
+    .ob-card p   { font-size: .82rem; color: var(--gray); margin-top: 2px; }
+
+    .ob-label {
+      display: block; font-size: .73rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; color: var(--dark); margin-bottom: .55rem;
+    }
+    .ob-section { margin-bottom: 1.25rem; }
+    .cb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; }
+    .cb-item {
+      display: flex; align-items: center; gap: .5rem; padding: .6rem .75rem;
+      border: 2px solid var(--border); border-radius: 9px; cursor: pointer;
+      transition: var(--ease); user-select: none;
+    }
+    .cb-item:has(input:checked) { border-color: var(--blue); background: var(--blue-light); }
+    .cb-item input { accent-color: var(--blue); width: 15px; height: 15px; }
+    .cb-item span  { font-size: .85rem; font-weight: 500; }
+
+    .num-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+    .num-group { display: flex; flex-direction: column; gap: .35rem; }
+    .num-group label { font-size: .78rem; font-weight: 600; color: var(--dark); }
+    .num-group input {
+      padding: .58rem .75rem; border: 2px solid var(--border); border-radius: 9px;
+      font-size: .95rem; outline: none; transition: var(--ease); width: 100%;
+    }
+    .num-group input:focus { border-color: var(--blue); }
+
+    .btn-primary {
+      width: 100%; padding: .85rem; background: var(--blue); color: #fff;
+      border: none; border-radius: 10px; font-size: 1rem; font-weight: 700;
+      cursor: pointer; transition: var(--ease); margin-top: .3rem;
+    }
+    .btn-primary:hover { background: var(--blue-mid); transform: translateY(-1px); box-shadow: var(--shadow-m); }
+
+    /* ── Recommendation cards ───────────────────────────────── */
+    #recs-section { margin-bottom: 2rem; }
+    .meal-badge {
+      font-size: .72rem; font-weight: 700; padding: .25rem .65rem;
+      background: var(--blue); color: #fff; border-radius: 20px;
+      text-transform: uppercase; letter-spacing: .5px;
+    }
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: .9rem;
+    }
+    .meal-card {
+      background: var(--white); border-radius: var(--r); padding: 1rem 1.05rem;
+      border: 1px solid var(--border); box-shadow: var(--shadow-s);
+      transition: var(--ease);
+    }
+    .meal-card:hover { box-shadow: var(--shadow-m); transform: translateY(-2px); }
+    .card-name     { font-size: .92rem; font-weight: 700; line-height: 1.35; margin-bottom: .2rem; }
+    .card-loc      { font-size: .72rem; color: var(--gray); margin-bottom: .65rem; }
+    .nut-row       { display: flex; gap: .4rem; margin-bottom: .55rem; flex-wrap: wrap; }
+    .npill         { font-size: .7rem; font-weight: 600; padding: .18rem .5rem; border-radius: 6px; }
+    .npill-cal     { background: var(--cal-bg); color: var(--cal-fg); }
+    .npill-pro     { background: var(--pro-bg); color: var(--pro-fg); }
+    .npill-na      { background: var(--border); color: var(--gray); }
+    .flag-row      { display: flex; flex-wrap: wrap; gap: .25rem; }
+    .flag          { font-size: .67rem; padding: .13rem .4rem; border-radius: 5px;
+                     background: var(--blue-light); color: var(--blue); font-weight: 500; }
+
+    #loading-msg, #error-msg {
+      text-align: center; padding: 2.5rem; background: var(--white);
+      border-radius: var(--r); border: 1px solid var(--border);
+    }
+    #error-msg { background: #FEF2F2; color: var(--red); border-color: #FECACA; }
+    .spinner {
+      width: 30px; height: 30px; border: 3px solid var(--border);
+      border-top-color: var(--blue); border-radius: 50%;
+      animation: spin .7s linear infinite; margin: 0 auto .75rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Map section ────────────────────────────────────────── */
+    #map-section { margin-bottom: 2rem; }
+    .map-wrap {
+      background: var(--white); border-radius: var(--r); overflow: hidden;
+      border: 1px solid var(--border); box-shadow: var(--shadow-s);
+    }
+    .map-frame { width: 100%; height: 360px; border: none; display: block; }
+    .halls-strip {
+      display: flex; flex-wrap: wrap; gap: .45rem;
+      padding: .9rem 1rem; border-top: 1px solid var(--border);
+    }
+    .hall-btn {
+      font-size: .75rem; font-weight: 600; padding: .32rem .7rem;
+      border-radius: 20px; border: 1.5px solid var(--border);
+      background: var(--white); color: var(--dark); cursor: pointer; transition: var(--ease);
+    }
+    .hall-btn:hover, .hall-btn.active {
+      border-color: var(--blue); background: var(--blue); color: #fff;
+    }
+    .hall-preview {
+      padding: .9rem 1rem 1.1rem; border-top: 1px solid var(--border);
+      display: none;
+    }
+    .hall-preview.show { display: block; }
+    .hall-preview h4 { font-size: .88rem; font-weight: 700; color: var(--blue); margin-bottom: .6rem; }
+    .preview-grid { display: grid; gap: 0; }
+    .preview-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      font-size: .8rem; padding: .3rem 0; border-bottom: 1px solid var(--border);
+    }
+    .preview-row:last-child { border-bottom: none; }
+    .preview-name { color: var(--dark); font-weight: 500; }
+    .preview-cal  { color: var(--gray); font-size: .72rem; }
+
+    /* ── Chat FAB ────────────────────────────────────────────── */
+    #chat-fab { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 400; }
+    .chat-trigger {
+      width: 56px; height: 56px; border-radius: 50%; background: var(--blue);
+      border: none; color: #fff; font-size: 1.4rem; cursor: pointer;
+      box-shadow: var(--shadow-l); transition: var(--ease);
+      display: grid; place-items: center; position: relative;
+    }
+    .chat-trigger:hover { background: var(--blue-mid); transform: scale(1.07); }
+    .chat-dot {
+      position: absolute; top: -3px; right: -3px; width: 16px; height: 16px;
+      background: var(--red); border-radius: 50%; border: 2px solid #fff;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{transform:scale(1)}50%{transform:scale(1.3)} }
+
+    .chat-panel {
+      position: absolute; bottom: 66px; right: 0; width: 300px;
+      background: var(--white); border-radius: 16px; box-shadow: var(--shadow-l);
+      overflow: hidden; display: none;
+      animation: chatPop .18s ease;
+      transform-origin: bottom right;
+    }
+    .chat-panel.open { display: block; }
+    @keyframes chatPop { from{transform:scale(.85);opacity:0} to{transform:scale(1);opacity:1} }
+    .chat-head {
+      background: var(--blue); color: #fff; padding: .8rem 1rem;
+      display: flex; align-items: center; gap: .55rem;
+    }
+    .chat-avatar {
+      width: 32px; height: 32px; background: rgba(255,255,255,.18);
+      border-radius: 50%; display: grid; place-items: center; font-size: 1rem; flex-shrink: 0;
+    }
+    .chat-head h3 { font-size: .85rem; font-weight: 700; flex: 1; }
+    .chat-close   { background: none; border: none; color: #fff; font-size: .95rem; cursor: pointer; opacity: .8; }
+    .chat-body    { padding: 1rem; }
+    .chat-msg {
+      background: var(--bg); border-radius: 10px 10px 10px 3px;
+      padding: .7rem .9rem; font-size: .83rem; line-height: 1.5;
+      margin-bottom: .75rem; color: var(--dark);
+    }
+    .energy-btns { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .45rem; margin-bottom: .75rem; }
+    .e-btn {
+      padding: .55rem .3rem; border: 2px solid var(--border); border-radius: 8px;
+      background: #fff; font-size: .78rem; font-weight: 600; cursor: pointer;
+      transition: var(--ease); text-align: center;
+    }
+    .e-btn:hover { border-color: var(--blue); }
+    .e-btn.sel-low    { background:#FEF3C7; border-color:#D97706; color:#92400E; }
+    .e-btn.sel-medium { background:#D1FAE5; border-color:#059669; color:#065F46; }
+    .e-btn.sel-high   { background:#DBEAFE; border-color:#2563EB; color:#1E40AF; }
+    .chat-tip {
+      background: var(--blue-light); border-left: 3px solid var(--blue);
+      border-radius: 0 8px 8px 0; padding: .6rem .8rem;
+      font-size: .79rem; line-height: 1.5; color: var(--dark); display: none;
+    }
+    .chat-tip.show { display: block; }
+
+    /* ── Utilities ───────────────────────────────────────────── */
+    .hidden { display: none !important; }
+    @media (max-width: 600px) {
+      main { padding: 1rem; }
+      .cards-grid { grid-template-columns: 1fr; }
+      .num-row { grid-template-columns: 1fr; }
+      .map-frame { height: 240px; }
+      .chat-panel { width: 270px; }
+      .ob-card { padding: 1.5rem 1.3rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Onboarding overlay ──────────────────────────────────── -->
+<div id="onboarding">
+  <div class="ob-card">
+    <div class="ob-logo-row">
+      <div class="ob-badge">🍽️</div>
+      <div>
+        <h2>JadGPT</h2>
+        <p>Your personal Yale dining assistant</p>
+      </div>
+    </div>
+
+    <div class="ob-section">
+      <label class="ob-label">Dietary Restrictions</label>
+      <div class="cb-grid">
+        <label class="cb-item">
+          <input type="checkbox" id="pref-vegetarian" value="vegetarian" />
+          <span>🥦 Vegetarian</span>
+        </label>
+        <label class="cb-item">
+          <input type="checkbox" id="pref-vegan" value="vegan" />
+          <span>🌱 Vegan</span>
+        </label>
+        <label class="cb-item">
+          <input type="checkbox" id="pref-gluten-free" value="gluten-free" />
+          <span>🌾 Gluten-Free</span>
+        </label>
+        <label class="cb-item">
+          <input type="checkbox" id="pref-halal" value="halal" />
+          <span>☪️ Halal</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="ob-section">
+      <div class="num-row">
+        <div class="num-group">
+          <label for="pref-calories">Daily Calorie Goal</label>
+          <input type="number" id="pref-calories" placeholder="e.g. 2000" min="800" max="6000" />
+        </div>
+        <div class="num-group">
+          <label for="pref-protein">Protein Goal (g)</label>
+          <input type="number" id="pref-protein" placeholder="e.g. 50" min="10" max="400" />
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-primary" onclick="savePrefs()">Let's Eat! →</button>
+  </div>
+</div>
+
+<!-- ── Header ─────────────────────────────────────────────── -->
+<header>
+  <div class="hd-logo">
+    <div class="hd-icon">🍽️</div>
+    <div>
+      <div class="hd-title">JadGPT</div>
+      <div class="hd-sub">Yale Dining Recommender</div>
+    </div>
+  </div>
+  <div class="hd-actions">
+    <button class="hd-btn" onclick="loadRecs()" title="Refresh recommendations">↻</button>
+    <button class="hd-btn" onclick="openOnboarding()" title="Edit preferences">⚙</button>
+  </div>
+</header>
+
+<!-- ── Main ───────────────────────────────────────────────── -->
+<main>
+
+  <!-- Prefs bar -->
+  <div id="prefs-bar">
+    <div class="ptags" id="ptags"></div>
+    <button class="btn-sm" onclick="openOnboarding()">Edit Preferences</button>
+  </div>
+
+  <!-- ── Recommendations ───────────────────────────────────── -->
+  <section id="recs-section">
+    <div class="sec-head">
+      <h2 class="sec-title">🍴 Today's Recommendations</h2>
+      <span class="meal-badge" id="meal-label">—</span>
+    </div>
+    <div id="loading-msg"><div class="spinner"></div>Fetching today's menu…</div>
+    <div id="error-msg" class="hidden"></div>
+    <div class="cards-grid" id="cards"></div>
+  </section>
+
+  <!-- ── Map ───────────────────────────────────────────────── -->
+  <section id="map-section">
+    <h2 class="sec-title" style="margin-bottom:.9rem">📍 Dining Halls on Campus</h2>
+    <div class="map-wrap">
+      <iframe id="map-frame" class="map-frame"
+        src="https://maps.google.com/maps?q=Yale+University+New+Haven+CT&z=15&output=embed"
+        allowfullscreen loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade">
+      </iframe>
+      <div class="halls-strip" id="halls-strip"></div>
+      <div class="hall-preview" id="hall-preview">
+        <h4 id="preview-title">Menu Preview</h4>
+        <div class="preview-grid" id="preview-items"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ── Chat FAB ───────────────────────────────────────────── -->
+<div id="chat-fab">
+  <button class="chat-trigger" id="chat-btn" onclick="toggleChat()" title="Energy Check-in">
+    💬
+    <span class="chat-dot hidden" id="chat-dot"></span>
+  </button>
+  <div class="chat-panel" id="chat-panel">
+    <div class="chat-head">
+      <div class="chat-avatar">🤖</div>
+      <h3>Jad — Energy Check-in</h3>
+      <button class="chat-close" onclick="toggleChat()">✕</button>
+    </div>
+    <div class="chat-body" id="chat-body"></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG & CONSTANTS
+   ============================================================ */
+const API = 'http://127.0.0.1:5000';
+
+const HALLS = [
+  { name:'Commons',      slug:'',                       q:'Schwarzman+Center+Yale+New+Haven+CT' },
+  { name:'Berkeley',     slug:'berkeley-college',       q:'Berkeley+College+Yale+University+New+Haven' },
+  { name:'Branford',     slug:'branford-college',       q:'Branford+College+Yale+University+New+Haven' },
+  { name:'Saybrook',     slug:'saybrook-college',       q:'Saybrook+College+Yale+University+New+Haven' },
+  { name:'TD',           slug:'timothy-dwight-college', q:'Timothy+Dwight+College+Yale+University+New+Haven' },
+  { name:'Morse',        slug:'morse-college',          q:'Morse+College+Yale+University+New+Haven' },
+  { name:'Ezra Stiles',  slug:'ezra-stiles-college',    q:'Ezra+Stiles+College+Yale+University+New+Haven' },
+  { name:'Pierson',      slug:'pierson-college',        q:'Pierson+College+Yale+University+New+Haven' },
+  { name:'Davenport',    slug:'davenport-college',      q:'Davenport+College+Yale+University+New+Haven' },
+  { name:'Trumbull',     slug:'trumbull-college',       q:'Trumbull+College+Yale+University+New+Haven' },
+  { name:'Hopper',       slug:'grace-hopper-college',   q:'Grace+Hopper+College+Yale+University+New+Haven' },
+  { name:'Pauli Murray', slug:'benjamin-franklin-college', q:'Pauli+Murray+College+Yale+University+New+Haven' },
+];
+
+const CHECKIN_HOURS = [8, 12, 18];
+
+const ENERGY_TIPS = {
+  low: {
+    default:    'Your body needs quick + sustained fuel. Look for oatmeal, lentil soup, whole-grain toast, or a banana with peanut butter.',
+    vegan:      'Try a lentil-based dish or a quinoa bowl — both are rich in iron and complex carbs for a lasting lift.',
+    vegetarian: 'A veggie grain bowl or egg dish will restore your energy. Pair with a warm broth if possible.',
+    halal:      'A warm broth-based soup with lean protein and whole grains would be ideal to restore your energy.',
+    'gluten-free': 'Go for rice, quinoa, or a protein-packed salad with beans — all naturally gluten-free energy boosters.',
+  },
+  medium: {
+    default:    "You're balanced! A protein + veggie plate will keep you steady through the rest of the day.",
+    vegan:      'A tofu or tempeh dish over brown rice keeps your energy stable. Add greens for micronutrients.',
+    vegetarian: 'A bean and veggie wrap or a grain bowl will maintain your momentum nicely.',
+    halal:      'Grilled chicken with rice and a side salad is a perfect balanced plate right now.',
+    'gluten-free': 'A rice bowl with grilled protein and roasted vegetables is a great choice.',
+  },
+  high: {
+    default:    "Great energy — keep it light! Lean protein + greens will sustain you without crashing.",
+    vegan:      'A Buddha bowl with edamame, avocado, and greens is perfect when you\'re feeling great.',
+    vegetarian: 'A light veggie stir-fry or a fresh salad with hard-boiled eggs will keep you sharp.',
+    halal:      'Grilled lean protein with a fresh salad will sustain your energy without weighing you down.',
+    'gluten-free': 'Grilled fish or chicken with a fresh garden salad is an excellent choice at peak energy.',
+  },
+};
+
+/* ============================================================
+   PREFERENCES
+   ============================================================ */
+function getPrefs() {
+  try { return JSON.parse(localStorage.getItem('jadgpt_prefs')); } catch { return null; }
+}
+
+function savePrefs() {
+  const restrictions = ['vegetarian','vegan','gluten-free','halal']
+    .filter(r => document.getElementById(`pref-${r}`)?.checked);
+  const calorie_goal = parseInt(document.getElementById('pref-calories')?.value) || 2000;
+  const protein_goal = parseInt(document.getElementById('pref-protein')?.value)  || 50;
+  const prefs = { restrictions, calorie_goal, protein_goal };
+  localStorage.setItem('jadgpt_prefs', JSON.stringify(prefs));
+  document.getElementById('onboarding').classList.add('hidden');
+  renderPrefsBar(prefs);
+  loadRecs();
+}
+
+function openOnboarding() {
+  const prefs = getPrefs();
+  if (prefs) {
+    ['vegetarian','vegan','gluten-free','halal'].forEach(r => {
+      const el = document.getElementById(`pref-${r}`);
+      if (el) el.checked = prefs.restrictions?.includes(r) ?? false;
+    });
+    const cal = document.getElementById('pref-calories');
+    const pro = document.getElementById('pref-protein');
+    if (cal) cal.value = prefs.calorie_goal || '';
+    if (pro) pro.value = prefs.protein_goal || '';
+  }
+  document.getElementById('onboarding').classList.remove('hidden');
+}
+
+function renderPrefsBar(prefs) {
+  const el = document.getElementById('ptags');
+  if (!el) return;
+  const tags = prefs.restrictions?.length
+    ? prefs.restrictions.map(r => `<span class="ptag">${r}</span>`).join('')
+    : '<span class="ptag">No restrictions</span>';
+  const cal  = prefs.calorie_goal ? `<span class="ptag">${prefs.calorie_goal} kcal</span>` : '';
+  const prot = prefs.protein_goal ? `<span class="ptag">${prefs.protein_goal}g protein</span>` : '';
+  el.innerHTML = tags + cal + prot;
+}
+
+/* ============================================================
+   MEAL RECOMMENDATIONS
+   ============================================================ */
+async function loadRecs() {
+  const prefs = getPrefs();
+  if (!prefs) return;
+
+  const loading  = document.getElementById('loading-msg');
+  const errMsg   = document.getElementById('error-msg');
+  const cards    = document.getElementById('cards');
+  const mealLbl  = document.getElementById('meal-label');
+
+  loading.classList.remove('hidden');
+  errMsg.classList.add('hidden');
+  cards.innerHTML = '';
+
+  try {
+    const res = await fetch(`${API}/recommend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        restrictions: prefs.restrictions || [],
+        calorie_goal: prefs.calorie_goal || 2000,
+        protein_goal: prefs.protein_goal || 50,
+      }),
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    loading.classList.add('hidden');
+    if (mealLbl) mealLbl.textContent = cap(data.meal || 'Meal');
+
+    window._menuData = data;   // cache for map preview
+
+    if (!data.recommendations?.length) {
+      cards.innerHTML = '<p style="color:var(--gray);padding:1rem">No matching items found. Try adjusting your dietary filters.</p>';
+      return;
+    }
+
+    data.recommendations.slice(0, 12).forEach(item => {
+      cards.insertAdjacentHTML('beforeend', cardHTML(item));
+    });
+
+  } catch (err) {
+    loading.classList.add('hidden');
+    errMsg.classList.remove('hidden');
+    errMsg.innerHTML = `
+      <strong>Could not reach backend.</strong><br>
+      Make sure Flask is running: <code>cd backend && python main.py</code><br>
+      <small style="color:#999">${esc(err.message)}</small>`;
+  }
+}
+
+function cardHTML(item) {
+  const cal  = item.calories  != null ? `<span class="npill npill-cal">${Math.round(item.calories)} cal</span>` : '<span class="npill npill-na">cal N/A</span>';
+  const prot = item.protein_g != null ? `<span class="npill npill-pro">${item.protein_g}g protein</span>` : '';
+  const flags = (item.dietary_flags || []).slice(0, 3).map(f => `<span class="flag">${esc(f)}</span>`).join('');
+  return `
+    <div class="meal-card">
+      <div class="card-name">${esc(item.name)}</div>
+      <div class="card-loc">📍 ${esc(item.dining_hall)} &middot; ${esc(item.station)}</div>
+      <div class="nut-row">${cal}${prot}</div>
+      ${flags ? `<div class="flag-row">${flags}</div>` : ''}
+    </div>`;
+}
+
+/* ============================================================
+   MAP & DINING HALL SELECTOR
+   ============================================================ */
+function initMap() {
+  const strip = document.getElementById('halls-strip');
+  HALLS.forEach((hall, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'hall-btn';
+    btn.textContent = hall.name;
+    btn.onclick = () => selectHall(i, btn);
+    strip.appendChild(btn);
+  });
+}
+
+function selectHall(index, btn) {
+  document.querySelectorAll('.hall-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const hall = HALLS[index];
+  document.getElementById('map-frame').src =
+    `https://maps.google.com/maps?q=${hall.q}&z=17&output=embed`;
+
+  const preview = document.getElementById('hall-preview');
+  const title   = document.getElementById('preview-title');
+  const items   = document.getElementById('preview-items');
+
+  title.textContent = `${hall.name} — Today's Menu`;
+  preview.classList.add('show');
+
+  // Try to show items from cached data first
+  const cached = window._menuData?.recommendations || [];
+  const slugMatch = hall.slug.replace('-college', '').replace(/-/g, ' ');
+  const local = cached.filter(x =>
+    x.dining_hall?.toLowerCase().includes(slugMatch) ||
+    x.dining_hall?.toLowerCase().includes(hall.name.toLowerCase())
+  ).slice(0, 6);
+
+  if (local.length > 0) {
+    renderPreviewItems(items, local);
+  } else if (hall.slug) {
+    items.innerHTML = '<p style="font-size:.78rem;color:var(--gray)">Loading…</p>';
+    fetchHallPreview(hall, items);
+  } else {
+    items.innerHTML = '<p style="font-size:.78rem;color:var(--gray)">Select a dining hall above to see its menu.</p>';
+  }
+}
+
+function renderPreviewItems(el, list) {
+  el.innerHTML = list.map(item => `
+    <div class="preview-row">
+      <span class="preview-name">${esc(item.name)}</span>
+      <span class="preview-cal">${item.calories ? Math.round(item.calories) + ' cal' : ''}</span>
+    </div>`).join('');
+}
+
+async function fetchHallPreview(hall, el) {
+  try {
+    const res = await fetch(`${API}/menu/${encodeURIComponent(hall.slug)}`);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    const allItems = Object.values(data.menu || {}).flat().slice(0, 6);
+    if (!allItems.length) { el.innerHTML = '<p style="font-size:.78rem;color:var(--gray)">No menu data available.</p>'; return; }
+    renderPreviewItems(el, allItems);
+  } catch {
+    el.innerHTML = '<p style="font-size:.78rem;color:var(--gray)">Menu unavailable for this hall.</p>';
+  }
+}
+
+/* ============================================================
+   CHATBOT / ENERGY CHECK-IN
+   ============================================================ */
+let chatOpen = false;
+let lastCheckinKey = null;
+
+function toggleChat() {
+  chatOpen = !chatOpen;
+  const panel = document.getElementById('chat-panel');
+  panel.classList.toggle('open', chatOpen);
+  if (chatOpen) {
+    document.getElementById('chat-dot').classList.add('hidden');
+    renderCheckin();
+  }
+}
+
+function renderCheckin() {
+  const body = document.getElementById('chat-body');
+  const h = new Date().getHours();
+  const ctx = h < 11 ? 'breakfast' : h < 15 ? 'lunch' : 'dinner';
+  body.innerHTML = `
+    <div class="chat-msg">Hey! It's ${ctx} time 🍴<br>How are your energy levels right now?</div>
+    <div class="energy-btns">
+      <button class="e-btn" onclick="pickEnergy('low',  this)">😴 Low</button>
+      <button class="e-btn" onclick="pickEnergy('medium',this)">😊 Medium</button>
+      <button class="e-btn" onclick="pickEnergy('high', this)">⚡ High</button>
+    </div>
+    <div class="chat-tip" id="chat-tip"></div>`;
+}
+
+function pickEnergy(level, btn) {
+  document.querySelectorAll('.e-btn').forEach(b => b.className = 'e-btn');
+  btn.classList.add(`sel-${level}`);
+
+  const prefs = getPrefs();
+  const tips  = ENERGY_TIPS[level];
+  const r     = prefs?.restrictions || [];
+
+  let tip = tips.default;
+  if      (r.includes('vegan'))        tip = tips.vegan;
+  else if (r.includes('vegetarian'))   tip = tips.vegetarian;
+  else if (r.includes('halal'))        tip = tips.halal;
+  else if (r.includes('gluten-free'))  tip = tips['gluten-free'];
+
+  const tipEl = document.getElementById('chat-tip');
+  tipEl.innerHTML = `<strong>${cap(level)} energy:</strong><br>${esc(tip)}`;
+  tipEl.classList.add('show');
+}
+
+function checkAutoCheckin() {
+  const now  = new Date();
+  const h    = now.getHours();
+  const m    = now.getMinutes();
+  const key  = `${now.toDateString()}-${h}`;
+  if (CHECKIN_HOURS.includes(h) && m < 5 && key !== lastCheckinKey) {
+    lastCheckinKey = key;
+    if (!chatOpen) document.getElementById('chat-dot').classList.remove('hidden');
+  }
+}
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+document.addEventListener('DOMContentLoaded', () => {
+  const prefs = getPrefs();
+
+  if (!prefs) {
+    document.getElementById('onboarding').classList.remove('hidden');
+  } else {
+    document.getElementById('onboarding').classList.add('hidden');
+    renderPrefsBar(prefs);
+    loadRecs();
+  }
+
+  initMap();
+  setInterval(checkAutoCheckin, 60_000);
+  checkAutoCheckin();
+});
+</script>
+</body>
+</html>
