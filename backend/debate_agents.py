@@ -238,16 +238,33 @@ def run_agent(
 # Recommender Agent
 # ============================================================
 
-def run_recommender(prefs: dict, rag, all_menus: dict, meal: str) -> str:
+def run_recommender(
+    prefs: dict,
+    rag,
+    all_menus: dict,
+    meal: str,
+    liked_items: list = None,
+    disliked_items: list = None,
+) -> str:
     """
     Single agent that searches today's menu and recommends a meal combination
     with portion sizes that together hit the user's calorie and protein goals.
+    Biases recommendations using the user's taste history when provided.
     """
     calorie_goal = int(prefs.get("calorie_goal", 2000))
     protein_goal = int(prefs.get("protein_goal", 50))
     # For a single meal, target roughly 1/3 of daily goals
     meal_cal_target  = round(calorie_goal / 3)
     meal_prot_target = round(protein_goal / 3)
+
+    # Build taste history section if feedback exists
+    taste_block = ""
+    if liked_items:
+        taste_block += "\nUSER TASTE HISTORY — Previously LIKED (prefer similar dishes):\n"
+        taste_block += "\n".join(f"  • {item}" for item in liked_items[:15])
+    if disliked_items:
+        taste_block += "\nUSER TASTE HISTORY — Previously DISLIKED (actively avoid recommending these):\n"
+        taste_block += "\n".join(f"  • {item}" for item in disliked_items[:15])
 
     system = f"""You are a Yale dining hall nutritionist helping students build an optimal meal plate.
 
@@ -264,7 +281,7 @@ RULES:
 - Recommend items that TOGETHER reach the calorie and protein targets, not individually
 - Always specify the PORTION SIZE for each item (use the serving info if available, otherwise say "1 standard serving")
 - Calculate and show the COMBINED nutrition total so the student can verify it hits their goals
-- Items can be from different dining halls — tell the student where to get each one
+- Items can be from different dining halls — tell the student where to get each one{taste_block}
 
 RESPONSE FORMAT (use exactly this structure):
 

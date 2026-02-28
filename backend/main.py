@@ -196,6 +196,9 @@ def agent_recommend():
     if isinstance(restrictions, str):
         restrictions = [r.strip() for r in restrictions.split(",") if r.strip()]
 
+    liked_items    = body.get("liked_items", []) or []
+    disliked_items = body.get("disliked_items", []) or []
+
     prefs = {
         "calorie_goal":  int(body.get("calorie_goal", 2000)),
         "protein_goal":  int(body.get("protein_goal", 50)),
@@ -207,7 +210,11 @@ def agent_recommend():
     try:
         meal, all_menus = _get_menus()
         rag = build_rag_from_menus(all_menus)
-        meal_plan = run_recommender(prefs, rag, all_menus, meal)
+        meal_plan = run_recommender(
+            prefs, rag, all_menus, meal,
+            liked_items=liked_items,
+            disliked_items=disliked_items,
+        )
         picks     = _extract_picks(meal_plan, all_menus)
         return jsonify({
             "meal":      meal,

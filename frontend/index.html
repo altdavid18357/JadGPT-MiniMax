@@ -232,12 +232,19 @@
       display: flex; align-items: center; gap: .6rem;
       padding: .75rem 1rem; background: var(--blue-light);
       border-bottom: 1px solid var(--border);
+      cursor: pointer; user-select: none;
     }
     .ai-plan-badge {
       font-size: .68rem; font-weight: 700; padding: .2rem .55rem;
       border-radius: 20px; background: var(--blue); color: #fff;
       letter-spacing: .3px;
     }
+    .ai-plan-toggle {
+      margin-left: auto; font-size: .7rem; font-weight: 600;
+      color: var(--blue); transition: var(--ease);
+    }
+    #ai-plan-body { overflow: hidden; }
+    #ai-plan-body.collapsed { display: none; }
     #ai-plan-loading {
       display: flex; align-items: center; gap: .75rem;
       padding: 1.25rem 1rem; font-size: .84rem; color: var(--gray);
@@ -255,14 +262,39 @@
     }
     #ai-plan-error.show { display: block; }
 
-    /* Map button on cards */
+    /* Card actions row (map btn + feedback) */
+    .card-actions {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: .55rem; gap: .4rem;
+    }
     .card-map-btn {
-      margin-top: .55rem; font-size: .71rem; font-weight: 600;
+      font-size: .71rem; font-weight: 600;
       padding: .22rem .6rem; border-radius: 20px;
       border: 1.5px solid var(--blue); background: transparent;
       color: var(--blue); cursor: pointer; transition: var(--ease);
     }
     .card-map-btn:hover { background: var(--blue); color: #fff; }
+
+    /* Feedback thumbs */
+    .feedback-btns { display: flex; gap: .2rem; }
+    .fb-btn {
+      background: none; border: 1.5px solid var(--border); border-radius: 20px;
+      font-size: .8rem; padding: .12rem .4rem; cursor: pointer; line-height: 1;
+      transition: var(--ease);
+    }
+    .fb-btn:hover { border-color: var(--blue); }
+    .fb-btn.active-like    { background: var(--pro-bg); border-color: var(--pro-fg); }
+    .fb-btn.active-dislike { background: #FEE2E2; border-color: #EF4444; }
+
+    /* Map AI pick highlight */
+    .preview-row-pick {
+      background: var(--blue-light); border-radius: 5px;
+      padding: .3rem .45rem; margin: .1rem 0; font-weight: 600;
+    }
+    .preview-section-label {
+      font-size: .66rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; color: var(--gray); padding: .5rem 0 .15rem;
+    }
 
     /* ── Map section ────────────────────────────────────────── */
     #map-section { margin-bottom: 2rem; }
@@ -477,7 +509,7 @@
     </div>
   </div>
   <div class="hd-actions">
-    <button class="hd-btn" onclick="loadRecs()" title="Refresh recommendations">↻</button>
+    <button class="hd-btn" onclick="loadAgentRecs()" title="Refresh recommendations">↻</button>
     <button class="hd-btn" onclick="openOnboarding()" title="Edit preferences">⚙</button>
   </div>
 </header>
@@ -512,22 +544,22 @@
     <div class="cards-grid" id="cards"></div>
   </section>
 
-  <!-- ── AI Meal Combination ───────────────────────────────── -->
+  <!-- ── AI Reasoning (collapsible) ──────────────────────── -->
   <section id="ai-plan-section">
-    <div class="sec-head">
-      <h2 class="sec-title">🤖 AI Meal Combination</h2>
-    </div>
     <div class="ai-plan-box">
-      <div class="ai-plan-header">
-        <span style="font-size:.88rem;font-weight:700;color:var(--blue)">Personalized Meal Plan</span>
+      <div class="ai-plan-header" onclick="toggleAiPlan()">
+        <span style="font-size:.88rem;font-weight:700;color:var(--blue)">🤖 AI Reasoning</span>
         <span class="ai-plan-badge">MiniMax</span>
+        <span class="ai-plan-toggle" id="ai-plan-toggle">▼ Show</span>
       </div>
-      <div id="ai-plan-loading">
-        <div class="spinner" style="width:20px;height:20px;border-width:2px;flex-shrink:0"></div>
-        Building your personalized meal combination…
+      <div id="ai-plan-body" class="collapsed">
+        <div id="ai-plan-loading" class="hidden">
+          <div class="spinner" style="width:20px;height:20px;border-width:2px;flex-shrink:0"></div>
+          Building your personalized meal combination…
+        </div>
+        <pre id="ai-plan-text"></pre>
+        <div id="ai-plan-error"></div>
       </div>
-      <pre id="ai-plan-text"></pre>
-      <div id="ai-plan-error"></div>
     </div>
   </section>
 
@@ -637,7 +669,7 @@ function savePrefs() {
   localStorage.setItem('jadgpt_prefs', JSON.stringify(prefs));
   document.getElementById('onboarding').classList.add('hidden');
   renderPrefsBar(prefs);
-  loadRecs();
+  loadAgentRecs();
 }
 
 function openOnboarding() {
@@ -710,9 +742,6 @@ async function loadRecs() {
       cards.insertAdjacentHTML('beforeend', cardHTML(item));
     });
 
-    // Trigger AI meal plan after basic recs load
-    loadAiPlan();
-
   } catch (err) {
     loading.classList.add('hidden');
     errMsg.classList.remove('hidden');
@@ -733,7 +762,10 @@ function cardHTML(item) {
       <div class="card-loc">📍 ${esc(item.dining_hall)} &middot; ${esc(item.station)}</div>
       <div class="nut-row">${cal}${prot}</div>
       ${flags ? `<div class="flag-row">${flags}</div>` : ''}
-      <button class="card-map-btn" onclick="goToHallOnMap(${JSON.stringify(item.dining_hall)})">📍 View on map</button>
+      <div class="card-actions">
+        <button class="card-map-btn" onclick="goToHallOnMap(${JSON.stringify(item.dining_hall)})">📍 View on map</button>
+        ${feedbackBtns(item.name, item.dining_hall)}
+      </div>
     </div>`;
 }
 
@@ -840,12 +872,25 @@ function selectHall(index, btn) {
   }
 }
 
-function renderPreviewItems(el, list) {
-  el.innerHTML = list.map(item => `
-    <div class="preview-row">
-      <span class="preview-name">${esc(item.name)}</span>
-      <span class="preview-cal">${item.calories ? Math.round(item.calories) + ' cal' : ''}</span>
-    </div>`).join('');
+function renderPreviewItems(el, aiPicks, restItems) {
+  let html = '';
+  if (aiPicks.length) {
+    html += `<div class="preview-section-label">⭐ AI Picks</div>`;
+    html += aiPicks.map(item => `
+      <div class="preview-row preview-row-pick">
+        <span class="preview-name">${esc(item.name)}</span>
+        <span class="preview-cal">${item.calories ? Math.round(item.calories) + ' cal' : ''}</span>
+      </div>`).join('');
+  }
+  if (restItems.length) {
+    if (aiPicks.length) html += `<div class="preview-section-label">Full Menu</div>`;
+    html += restItems.map(item => `
+      <div class="preview-row">
+        <span class="preview-name">${esc(item.name)}</span>
+        <span class="preview-cal">${item.calories ? Math.round(item.calories) + ' cal' : ''}</span>
+      </div>`).join('');
+  }
+  el.innerHTML = html || '<p style="font-size:.78rem;color:var(--gray)">No menu data available.</p>';
 }
 
 async function fetchHallPreview(hall, el) {
@@ -855,7 +900,19 @@ async function fetchHallPreview(hall, el) {
     const data = await res.json();
     const allItems = Object.values(data.menu || {}).flat();
     if (!allItems.length) { el.innerHTML = '<p style="font-size:.78rem;color:var(--gray)">No menu data available.</p>'; return; }
-    renderPreviewItems(el, allItems);
+
+    // Separate AI picks for this hall from the rest of the menu
+    const hallNameLower = hall.name.toLowerCase();
+    const slugMatch = hall.slug.replace('-college', '').replace(/-/g, ' ');
+    const aiPicks = (window._menuData?.picks || []).filter(x => {
+      const dh = (x.dining_hall || '').toLowerCase();
+      return dh.includes(hallNameLower) || dh.includes(slugMatch) ||
+             hallNameLower.includes((dh.split(' ')[0]) || '');
+    });
+    const aiPickNames = new Set(aiPicks.map(x => x.name.toLowerCase()));
+    const restItems = allItems.filter(x => !aiPickNames.has(x.name.toLowerCase()));
+
+    renderPreviewItems(el, aiPicks, restItems);
   } catch {
     el.innerHTML = '<p style="font-size:.78rem;color:var(--gray)">Menu unavailable for this hall.</p>';
   }
@@ -1255,7 +1312,7 @@ function clearRestrictions() {
 
 // ── Inline menu suggestions ───────────────────────────────────
 function showMenuSuggestions(mode, prefs) {
-  let items = [...(window._menuData?.recommendations || [])];
+  let items = [...(window._menuData?.picks || window._menuData?.recommendations || [])];
 
   if      (mode === 'high_protein') items = items.filter(x => (x.protein_g || 0) >= 15).sort((a,b) => (b.protein_g||0)-(a.protein_g||0));
   else if (mode === 'light')        items = items.filter(x => x.calories && x.calories < 320).sort((a,b) => (a.calories||999)-(b.calories||999));
@@ -1377,11 +1434,13 @@ async function loadAgentRecs() {
   const prefs = getPrefs();
   if (!prefs) return;
 
-  const agentLog = document.getElementById('agent-log');
-  const loading  = document.getElementById('loading-msg');
-  const errMsg   = document.getElementById('error-msg');
-  const cards    = document.getElementById('cards');
-  const mealLbl  = document.getElementById('meal-label');
+  const agentLog  = document.getElementById('agent-log');
+  const loading   = document.getElementById('loading-msg');
+  const errMsg    = document.getElementById('error-msg');
+  const cards     = document.getElementById('cards');
+  const mealLbl   = document.getElementById('meal-label');
+  const planText  = document.getElementById('ai-plan-text');
+  const planErr   = document.getElementById('ai-plan-error');
 
   agentLog.classList.remove('hidden');
   clearLogSteps();
@@ -1389,6 +1448,15 @@ async function loadAgentRecs() {
   loading.classList.remove('hidden');
   errMsg.classList.add('hidden');
   cards.innerHTML = '';
+  planText?.classList.remove('show');
+  planErr?.classList.remove('show');
+
+  // Collapse AI reasoning panel while new results load
+  document.getElementById('ai-plan-body')?.classList.add('collapsed');
+  const toggleEl = document.getElementById('ai-plan-toggle');
+  if (toggleEl) toggleEl.textContent = '▼ Show';
+
+  const { liked, disliked } = buildFeedbackContext();
 
   try {
     const res = await fetch(`${API}/agent/recommend`, {
@@ -1399,6 +1467,8 @@ async function loadAgentRecs() {
         calorie_goal:   prefs.calorie_goal || 2000,
         protein_goal:   prefs.protein_goal || 50,
         energy_history: buildEnergyContext(),
+        liked_items:    liked,
+        disliked_items: disliked,
       }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1406,37 +1476,102 @@ async function loadAgentRecs() {
 
     loading.classList.add('hidden');
 
-    if (data.fallback) {
-      agentLog.classList.add('hidden');
-      loadRecs();
-      return;
-    }
+    if (data.error) throw new Error(data.error);
 
     if (mealLbl) mealLbl.textContent = cap(data.meal || 'Meal');
 
     (data.tool_log || []).forEach(s =>
       appendLogStep(TOOL_ICONS[s.tool] || '⚙️', s.tool.replace(/_/g, ' '), s.summary || '')
     );
-    setLogStatus(`Done — ${data.tool_log?.length || 0} tools called`, false);
+    setLogStatus('Done — recommendations ready', false);
 
+    // Store for map preview and chatbot suggestions
     window._menuData = data;
-
-    if (data.summary) {
-      cards.insertAdjacentHTML('beforeend', `<div class="agent-summary">${esc(data.summary)}</div>`);
+    // Normalise so showMenuSuggestions works regardless of call path
+    if (!window._menuData.recommendations) {
+      window._menuData.recommendations = data.picks || [];
     }
 
-    if (!data.recommendations?.length) {
-      cards.insertAdjacentHTML('beforeend', '<p style="color:var(--gray);padding:1rem">No matching items found. Try adjusting your dietary filters.</p>');
+    // Populate collapsible AI reasoning panel
+    if (data.meal_plan && planText) {
+      planText.textContent = data.meal_plan;
+      planText.classList.add('show');
+    }
+
+    // Render picks as primary recommendation cards
+    const picks = data.picks || [];
+    if (!picks.length) {
+      cards.insertAdjacentHTML('beforeend',
+        '<p style="color:var(--gray);padding:1rem">No matching items found. Try adjusting your dietary filters.</p>');
       return;
     }
 
-    data.recommendations.forEach(item => cards.insertAdjacentHTML('beforeend', agentCardHTML(item)));
+    picks.forEach(item => cards.insertAdjacentHTML('beforeend', agentCardHTML(item)));
+
+    // Auto-navigate map to first pick's hall
+    if (picks[0]?.dining_hall) goToHallOnMap(picks[0].dining_hall);
 
   } catch {
     loading.classList.add('hidden');
     agentLog.classList.add('hidden');
     loadRecs();
   }
+}
+
+/* ============================================================
+   FEEDBACK (taste profile)
+   ============================================================ */
+const FEEDBACK_KEY = 'boolabites_feedback';
+
+function getFeedback() {
+  try { return JSON.parse(localStorage.getItem(FEEDBACK_KEY)) || {}; }
+  catch { return {}; }
+}
+
+function saveFeedback(feedback) {
+  localStorage.setItem(FEEDBACK_KEY, JSON.stringify(feedback));
+}
+
+function rateDish(name, hall, liked, btn) {
+  const feedback = getFeedback();
+  const key = `${name}@${hall}`;
+  feedback[key] = { name, hall, liked, date: new Date().toISOString().slice(0, 10) };
+  // Prune to last 30 entries by date
+  const entries = Object.entries(feedback)
+    .sort((a, b) => (a[1].date > b[1].date ? 1 : -1));
+  if (entries.length > 30) entries.splice(0, entries.length - 30);
+  saveFeedback(Object.fromEntries(entries));
+  // Update button states
+  const btns = btn.closest('.feedback-btns')?.querySelectorAll('.fb-btn');
+  btns?.forEach(b => b.classList.remove('active-like', 'active-dislike'));
+  btn.classList.add(liked ? 'active-like' : 'active-dislike');
+}
+
+function buildFeedbackContext() {
+  const entries = Object.values(getFeedback());
+  return {
+    liked:    entries.filter(e => e.liked === true ).map(e => e.name),
+    disliked: entries.filter(e => e.liked === false).map(e => e.name),
+  };
+}
+
+function feedbackBtns(name, hall) {
+  const fb  = getFeedback()[`${name}@${hall}`];
+  const likeClass    = fb?.liked === true  ? ' active-like'    : '';
+  const dislikeClass = fb?.liked === false ? ' active-dislike' : '';
+  return `<div class="feedback-btns">
+    <button class="fb-btn${likeClass}"    onclick="rateDish(${JSON.stringify(name)},${JSON.stringify(hall)},true,this)"  title="Liked this">👍</button>
+    <button class="fb-btn${dislikeClass}" onclick="rateDish(${JSON.stringify(name)},${JSON.stringify(hall)},false,this)" title="Not for me">👎</button>
+  </div>`;
+}
+
+/* ── AI reasoning toggle ──────────────────────────────────── */
+function toggleAiPlan() {
+  const body   = document.getElementById('ai-plan-body');
+  const toggle = document.getElementById('ai-plan-toggle');
+  if (!body) return;
+  const collapsed = body.classList.toggle('collapsed');
+  if (toggle) toggle.textContent = collapsed ? '▼ Show' : '▲ Hide';
 }
 
 function agentCardHTML(item) {
@@ -1451,6 +1586,10 @@ function agentCardHTML(item) {
       <div class="nut-row">${cal}${prot}</div>
       ${flags ? `<div class="flag-row">${flags}</div>` : ''}
       ${reason}
+      <div class="card-actions">
+        <button class="card-map-btn" onclick="goToHallOnMap(${JSON.stringify(item.dining_hall)})">📍 View on map</button>
+        ${feedbackBtns(item.name, item.dining_hall)}
+      </div>
     </div>`;
 }
 
@@ -1512,7 +1651,7 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     document.getElementById('onboarding').classList.add('hidden');
     renderPrefsBar(prefs);
-    loadRecs();
+    loadAgentRecs();
   }
 
   initMap();
