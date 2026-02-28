@@ -1,0 +1,1668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BoolaBites — Yale Dining Recommender</title>
+  <style>
+    /* ── Variables ──────────────────────────────────────────── */
+    :root {
+      --blue:       #00356B;
+      --blue-mid:   #286DC0;
+      --blue-light: #EBF2FA;
+      --white:      #FFFFFF;
+      --bg:         #F4F6F9;
+      --border:     #DDE3EC;
+      --gray:       #6B7280;
+      --dark:       #1F2937;
+      --cal-bg:     #FEF3C7;
+      --cal-fg:     #92400E;
+      --pro-bg:     #D1FAE5;
+      --pro-fg:     #065F46;
+      --red:        #DC2626;
+      --shadow-s:   0 1px 3px rgba(0,0,0,.08);
+      --shadow-m:   0 4px 14px rgba(0,0,0,.10);
+      --shadow-l:   0 10px 30px rgba(0,0,0,.14);
+      --r:          12px;
+      --ease:       0.18s ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+           background: var(--bg); color: var(--dark); min-height: 100vh; }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    header {
+      background: var(--blue); color: var(--white);
+      padding: .85rem 1.4rem;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 200;
+      box-shadow: 0 2px 10px rgba(0,0,0,.22);
+    }
+    .hd-logo { display: flex; align-items: center; gap: .7rem; }
+    .hd-icon {
+      width: 38px; height: 38px; background: rgba(255,255,255,.15);
+      border-radius: 9px; display: grid; place-items: center; font-size: 1.25rem;
+    }
+    .hd-title { font-size: 1.15rem; font-weight: 800; letter-spacing: -.3px; }
+    .hd-sub   { font-size: .72rem; opacity: .75; margin-top: 1px; }
+    .hd-actions { display: flex; gap: .45rem; }
+    .hd-btn {
+      background: rgba(255,255,255,.13); border: none; color: #fff;
+      width: 36px; height: 36px; border-radius: 8px; cursor: pointer;
+      font-size: 1rem; display: grid; place-items: center; transition: var(--ease);
+    }
+    .hd-btn:hover { background: rgba(255,255,255,.25); }
+
+    /* ── Main layout ─────────────────────────────────────────── */
+    main { max-width: 1080px; margin: 0 auto; padding: 1.4rem; }
+
+    /* ── Section headings ──────────────────────────────────── */
+    .sec-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: .9rem;
+    }
+    .sec-title {
+      font-size: 1.05rem; font-weight: 700; color: var(--blue);
+      display: flex; align-items: center; gap: .4rem;
+    }
+
+    /* ── Prefs bar ──────────────────────────────────────────── */
+    #prefs-bar {
+      background: var(--white); border-radius: var(--r);
+      padding: .75rem 1.1rem; margin-bottom: 1.3rem;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: .5rem; box-shadow: var(--shadow-s);
+      border: 1px solid var(--border);
+    }
+    .ptags { display: flex; flex-wrap: wrap; gap: .4rem; }
+    .ptag {
+      font-size: .72rem; font-weight: 600; padding: .22rem .6rem;
+      border-radius: 20px; background: var(--blue-light); color: var(--blue);
+    }
+    .btn-sm {
+      font-size: .75rem; font-weight: 600; padding: .28rem .7rem;
+      border-radius: 20px; border: 1.5px solid var(--blue);
+      background: transparent; color: var(--blue); cursor: pointer; transition: var(--ease);
+    }
+    .btn-sm:hover { background: var(--blue); color: #fff; }
+
+    /* ── Onboarding overlay ─────────────────────────────────── */
+    #onboarding {
+      position: fixed; inset: 0; z-index: 900;
+      background: rgba(0,35,80,.82); backdrop-filter: blur(5px);
+      display: flex; align-items: center; justify-content: center; padding: 1rem;
+    }
+    #onboarding.hidden { display: none; }
+    .ob-card {
+      background: var(--white); border-radius: 20px; padding: 2rem 2.1rem;
+      max-width: 460px; width: 100%; box-shadow: var(--shadow-l);
+    }
+    .ob-logo-row { display: flex; align-items: center; gap: .8rem; margin-bottom: 1.6rem; }
+    .ob-badge {
+      width: 50px; height: 50px; background: var(--blue); border-radius: 13px;
+      display: grid; place-items: center; font-size: 1.6rem; color: #fff;
+      flex-shrink: 0;
+    }
+    .ob-card h2  { font-size: 1.45rem; font-weight: 800; color: var(--blue); }
+    .ob-card p   { font-size: .82rem; color: var(--gray); margin-top: 2px; }
+
+    .ob-label {
+      display: block; font-size: .73rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; color: var(--dark); margin-bottom: .55rem;
+    }
+    .ob-section { margin-bottom: 1.25rem; }
+    .cb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; }
+    .cb-item {
+      display: flex; align-items: center; gap: .5rem; padding: .6rem .75rem;
+      border: 2px solid var(--border); border-radius: 9px; cursor: pointer;
+      transition: var(--ease); user-select: none;
+    }
+    .cb-item:has(input:checked) { border-color: var(--blue); background: var(--blue-light); }
+    .cb-item input { accent-color: var(--blue); width: 15px; height: 15px; }
+    .cb-item span  { font-size: .85rem; font-weight: 500; }
+
+    .num-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+    .num-group { display: flex; flex-direction: column; gap: .35rem; }
+    .num-group label { font-size: .78rem; font-weight: 600; color: var(--dark); }
+    .num-group input {
+      padding: .58rem .75rem; border: 2px solid var(--border); border-radius: 9px;
+      font-size: .95rem; outline: none; transition: var(--ease); width: 100%;
+    }
+    .num-group input:focus { border-color: var(--blue); }
+
+    .btn-primary {
+      width: 100%; padding: .85rem; background: var(--blue); color: #fff;
+      border: none; border-radius: 10px; font-size: 1rem; font-weight: 700;
+      cursor: pointer; transition: var(--ease); margin-top: .3rem;
+    }
+    .btn-primary:hover { background: var(--blue-mid); transform: translateY(-1px); box-shadow: var(--shadow-m); }
+
+    /* ── Agent log panel ────────────────────────────────────── */
+    #agent-log {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--r); margin-bottom: 1rem; overflow: hidden;
+      box-shadow: var(--shadow-s);
+    }
+    #agent-log.hidden { display: none; }
+    .log-header {
+      padding: .65rem 1rem; display: flex; align-items: center; gap: .5rem;
+      cursor: pointer; font-size: .8rem; font-weight: 600; color: var(--blue);
+      background: var(--blue-light); user-select: none;
+    }
+    .log-spinner {
+      width: 13px; height: 13px; border: 2px solid var(--border);
+      border-top-color: var(--blue); border-radius: 50%;
+      animation: spin .6s linear infinite; flex-shrink: 0;
+    }
+    .log-toggle { margin-left: auto; font-size: .7rem; transition: var(--ease); }
+    .log-toggle.open { transform: rotate(180deg); }
+    .log-steps { display: none; padding: .5rem .9rem .7rem; }
+    .log-steps.open { display: block; }
+    .log-step {
+      display: flex; align-items: baseline; gap: .5rem;
+      font-size: .76rem; padding: .28rem 0; border-bottom: 1px solid var(--border);
+    }
+    .log-step:last-child { border-bottom: none; }
+    .log-step-icon { flex-shrink: 0; font-style: normal; }
+    .log-step-name { font-weight: 700; color: var(--dark); min-width: 130px; }
+    .log-step-detail { color: var(--gray); }
+
+    /* Agent summary banner */
+    .agent-summary {
+      grid-column: 1 / -1; background: var(--blue-light);
+      border-left: 3px solid var(--blue); border-radius: 0 var(--r) var(--r) 0;
+      padding: .75rem 1rem; font-size: .84rem; line-height: 1.6; color: var(--dark);
+      margin-bottom: .25rem;
+    }
+
+    /* ── Recommendation cards ───────────────────────────────── */
+    #recs-section { margin-bottom: 2rem; }
+    .meal-badge {
+      font-size: .72rem; font-weight: 700; padding: .25rem .65rem;
+      background: var(--blue); color: #fff; border-radius: 20px;
+      text-transform: uppercase; letter-spacing: .5px;
+    }
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: .9rem;
+    }
+    .meal-card {
+      background: var(--white); border-radius: var(--r); padding: 1rem 1.05rem;
+      border: 1px solid var(--border); box-shadow: var(--shadow-s);
+      transition: var(--ease);
+    }
+    .meal-card:hover { box-shadow: var(--shadow-m); transform: translateY(-2px); }
+    .card-name     { font-size: .92rem; font-weight: 700; line-height: 1.35; margin-bottom: .2rem; }
+    .card-loc      { font-size: .72rem; color: var(--gray); margin-bottom: .65rem; }
+    .nut-row       { display: flex; gap: .4rem; margin-bottom: .55rem; flex-wrap: wrap; }
+    .npill         { font-size: .7rem; font-weight: 600; padding: .18rem .5rem; border-radius: 6px; }
+    .npill-cal     { background: var(--cal-bg); color: var(--cal-fg); }
+    .npill-pro     { background: var(--pro-bg); color: var(--pro-fg); }
+    .npill-na      { background: var(--border); color: var(--gray); }
+    .flag-row      { display: flex; flex-wrap: wrap; gap: .25rem; }
+    .flag          { font-size: .67rem; padding: .13rem .4rem; border-radius: 5px;
+                     background: var(--blue-light); color: var(--blue); font-weight: 500; }
+
+    .card-reason {
+      margin-top: .45rem; font-size: .74rem; color: var(--blue-mid);
+      font-style: italic; line-height: 1.4;
+    }
+
+    #loading-msg, #error-msg {
+      text-align: center; padding: 2.5rem; background: var(--white);
+      border-radius: var(--r); border: 1px solid var(--border);
+    }
+    #error-msg { background: #FEF2F2; color: var(--red); border-color: #FECACA; }
+    .spinner {
+      width: 30px; height: 30px; border: 3px solid var(--border);
+      border-top-color: var(--blue); border-radius: 50%;
+      animation: spin .7s linear infinite; margin: 0 auto .75rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── AI Plan section ────────────────────────────────────── */
+    #ai-plan-section { margin-bottom: 2rem; }
+    .ai-plan-box {
+      background: var(--white); border-radius: var(--r);
+      border: 1px solid var(--border); box-shadow: var(--shadow-s);
+      overflow: hidden;
+    }
+    .ai-plan-header {
+      display: flex; align-items: center; gap: .6rem;
+      padding: .75rem 1rem; background: var(--blue-light);
+      border-bottom: 1px solid var(--border);
+      cursor: pointer; user-select: none;
+    }
+    .ai-plan-badge {
+      font-size: .68rem; font-weight: 700; padding: .2rem .55rem;
+      border-radius: 20px; background: var(--blue); color: #fff;
+      letter-spacing: .3px;
+    }
+    .ai-plan-toggle {
+      margin-left: auto; font-size: .7rem; font-weight: 600;
+      color: var(--blue); transition: var(--ease);
+    }
+    #ai-plan-body { overflow: hidden; }
+    #ai-plan-body.collapsed { display: none; }
+    #ai-plan-loading {
+      display: flex; align-items: center; gap: .75rem;
+      padding: 1.25rem 1rem; font-size: .84rem; color: var(--gray);
+    }
+    #ai-plan-loading.hidden { display: none; }
+    #ai-plan-text {
+      white-space: pre-wrap; font-family: inherit; font-size: .84rem;
+      line-height: 1.65; color: var(--dark); padding: 1rem 1.1rem;
+      margin: 0; display: none;
+    }
+    #ai-plan-text.show { display: block; }
+    #ai-plan-error {
+      padding: .75rem 1rem; font-size: .82rem; color: var(--red);
+      background: #FEF2F2; display: none;
+    }
+    #ai-plan-error.show { display: block; }
+
+    /* Card actions row (map btn + feedback) */
+    .card-actions {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: .55rem; gap: .4rem;
+    }
+    .card-map-btn {
+      font-size: .71rem; font-weight: 600;
+      padding: .22rem .6rem; border-radius: 20px;
+      border: 1.5px solid var(--blue); background: transparent;
+      color: var(--blue); cursor: pointer; transition: var(--ease);
+    }
+    .card-map-btn:hover { background: var(--blue); color: #fff; }
+
+    /* Feedback thumbs */
+    .feedback-btns { display: flex; gap: .2rem; }
+    .fb-btn {
+      background: none; border: 1.5px solid var(--border); border-radius: 20px;
+      font-size: .8rem; padding: .12rem .4rem; cursor: pointer; line-height: 1;
+      transition: var(--ease);
+    }
+    .fb-btn:hover { border-color: var(--blue); }
+    .fb-btn.active-like    { background: var(--pro-bg); border-color: var(--pro-fg); }
+    .fb-btn.active-dislike { background: #FEE2E2; border-color: #EF4444; }
+
+    /* Map AI pick highlight */
+    .preview-row-pick {
+      background: var(--blue-light); border-radius: 5px;
+      padding: .3rem .45rem; margin: .1rem 0; font-weight: 600;
+    }
+    .preview-section-label {
+      font-size: .66rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; color: var(--gray); padding: .5rem 0 .15rem;
+    }
+
+    /* ── Map section ────────────────────────────────────────── */
+    #map-section { margin-bottom: 2rem; }
+    .map-wrap {
+      background: var(--white); border-radius: var(--r); overflow: hidden;
+      border: 1px solid var(--border); box-shadow: var(--shadow-s);
+    }
+    .map-frame { width: 100%; height: 360px; border: none; display: block; }
+    .halls-strip {
+      display: flex; flex-wrap: wrap; gap: .45rem;
+      padding: .9rem 1rem; border-top: 1px solid var(--border);
+    }
+    .hall-btn {
+      font-size: .75rem; font-weight: 600; padding: .32rem .7rem;
+      border-radius: 20px; border: 1.5px solid var(--border);
+      background: var(--white); color: var(--dark); cursor: pointer; transition: var(--ease);
+    }
+    .hall-btn:hover, .hall-btn.active {
+      border-color: var(--blue); background: var(--blue); color: #fff;
+    }
+    .hall-preview {
+      padding: .9rem 1rem 1.1rem; border-top: 1px solid var(--border);
+      display: none;
+    }
+    .hall-preview.show { display: block; }
+    .hall-preview h4 { font-size: .88rem; font-weight: 700; color: var(--blue); margin-bottom: .6rem; }
+    .preview-grid { display: grid; gap: 0; }
+    .preview-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      font-size: .8rem; padding: .3rem 0; border-bottom: 1px solid var(--border);
+    }
+    .preview-row:last-child { border-bottom: none; }
+    .preview-name { color: var(--dark); font-weight: 500; }
+    .preview-cal  { color: var(--gray); font-size: .72rem; }
+
+    /* ── Chat FAB ────────────────────────────────────────────── */
+    #chat-fab { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 400; }
+    .chat-trigger {
+      width: 56px; height: 56px; border-radius: 50%; background: var(--blue);
+      border: none; color: #fff; font-size: 1.4rem; cursor: pointer;
+      box-shadow: var(--shadow-l); transition: var(--ease);
+      display: grid; place-items: center; position: relative;
+    }
+    .chat-trigger:hover { background: var(--blue-mid); transform: scale(1.07); }
+    .chat-dot {
+      position: absolute; top: -3px; right: -3px; width: 16px; height: 16px;
+      background: var(--red); border-radius: 50%; border: 2px solid #fff;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{transform:scale(1)}50%{transform:scale(1.3)} }
+
+    .chat-panel {
+      position: absolute; bottom: 66px; right: 0; width: 330px;
+      background: var(--white); border-radius: 16px; box-shadow: var(--shadow-l);
+      display: none; flex-direction: column; max-height: 500px;
+      animation: chatPop .18s ease; transform-origin: bottom right;
+    }
+    .chat-panel.open { display: flex; }
+    @keyframes chatPop { from{transform:scale(.85);opacity:0} to{transform:scale(1);opacity:1} }
+
+    .chat-head {
+      background: var(--blue); color: #fff; padding: .75rem 1rem;
+      display: flex; align-items: center; gap: .55rem; flex-shrink: 0;
+      border-radius: 16px 16px 0 0;
+    }
+    .chat-avatar {
+      width: 34px; height: 34px; background: rgba(255,255,255,.18);
+      border-radius: 50%; display: grid; place-items: center; font-size: 1.1rem; flex-shrink: 0;
+    }
+    .chat-head-info { flex: 1; }
+    .chat-head h3   { font-size: .85rem; font-weight: 700; line-height: 1.2; }
+    .chat-status    { font-size: .67rem; opacity: .72; }
+    .chat-close     { background: none; border: none; color: #fff; font-size: .95rem; cursor: pointer; opacity: .75; padding: .2rem; }
+    .chat-close:hover { opacity: 1; }
+
+    /* Messages */
+    .chat-messages {
+      flex: 1; overflow-y: auto; padding: .85rem 1rem;
+      display: flex; flex-direction: column; gap: .5rem;
+      scroll-behavior: smooth; min-height: 180px;
+    }
+    .chat-messages::-webkit-scrollbar { width: 3px; }
+    .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .msg            { display: flex; flex-direction: column; max-width: 90%; }
+    .msg-bot        { align-self: flex-start; }
+    .msg-user       { align-self: flex-end; align-items: flex-end; }
+    .msg-bubble     { padding: .6rem .85rem; border-radius: 12px; font-size: .82rem; line-height: 1.5; }
+    .msg-bot  .msg-bubble { background: var(--bg); color: var(--dark); border-radius: 3px 12px 12px 12px; }
+    .msg-user .msg-bubble { background: var(--blue); color: #fff; border-radius: 12px 12px 3px 12px; }
+    .msg-time { font-size: .62rem; color: var(--gray); margin-top: .18rem; padding: 0 .15rem; }
+
+    /* Typing indicator */
+    .typing-dots { display: flex; align-items: center; gap: 4px; padding: .25rem .1rem; }
+    .tdot {
+      width: 7px; height: 7px; background: var(--gray); border-radius: 50%;
+      animation: tdot .9s ease-in-out infinite;
+    }
+    .tdot:nth-child(2) { animation-delay: .15s; }
+    .tdot:nth-child(3) { animation-delay: .3s; }
+    @keyframes tdot { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-5px)} }
+
+    /* Quick chips */
+    .quick-chips {
+      display: flex; flex-wrap: wrap; gap: .32rem;
+      padding: .5rem .9rem; border-top: 1px solid var(--border); flex-shrink: 0;
+    }
+    .chip {
+      font-size: .71rem; font-weight: 600; padding: .25rem .6rem;
+      border-radius: 20px; border: 1.5px solid var(--blue);
+      background: var(--white); color: var(--blue); cursor: pointer;
+      transition: var(--ease); white-space: nowrap;
+    }
+    .chip:hover { background: var(--blue); color: #fff; }
+
+    /* Inline suggested items */
+    .chat-item-row {
+      padding: .28rem 0; border-bottom: 1px solid var(--border); font-size: .79rem;
+    }
+    .chat-item-row:last-child { border-bottom: none; }
+
+    /* Input row */
+    .chat-input-row {
+      display: flex; gap: .4rem; padding: .6rem .9rem;
+      border-top: 1px solid var(--border); flex-shrink: 0; align-items: center;
+    }
+    .chat-input {
+      flex: 1; border: 1.5px solid var(--border); border-radius: 20px;
+      padding: .42rem .8rem; font-size: .82rem; outline: none;
+      transition: var(--ease); background: var(--bg); color: var(--dark);
+    }
+    .chat-input:focus { border-color: var(--blue); background: #fff; }
+    .chat-send {
+      width: 30px; height: 30px; border-radius: 50%; background: var(--blue);
+      border: none; color: #fff; font-size: .85rem; cursor: pointer;
+      display: grid; place-items: center; transition: var(--ease); flex-shrink: 0;
+    }
+    .chat-send:hover { background: var(--blue-mid); }
+    .chat-send:disabled { background: var(--border); cursor: default; }
+
+    /* ── Utilities ───────────────────────────────────────────── */
+    .hidden { display: none !important; }
+    @media (max-width: 600px) {
+      main { padding: 1rem; }
+      .cards-grid { grid-template-columns: 1fr; }
+      .num-row { grid-template-columns: 1fr; }
+      .map-frame { height: 240px; }
+      .chat-panel { width: 270px; }
+      .ob-card { padding: 1.5rem 1.3rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Onboarding overlay ──────────────────────────────────── -->
+<div id="onboarding">
+  <div class="ob-card">
+    <div class="ob-logo-row">
+      <div class="ob-badge">🍽️</div>
+      <div>
+        <h2>BoolaBites</h2>
+        <p>Your personal Yale dining assistant</p>
+      </div>
+    </div>
+
+    <div class="ob-section">
+      <label class="ob-label">Dietary Restrictions</label>
+      <div class="cb-grid">
+        <label class="cb-item">
+          <input type="checkbox" id="pref-vegetarian" value="vegetarian" />
+          <span>🥦 Vegetarian</span>
+        </label>
+        <label class="cb-item">
+          <input type="checkbox" id="pref-vegan" value="vegan" />
+          <span>🌱 Vegan</span>
+        </label>
+        <label class="cb-item">
+          <input type="checkbox" id="pref-gluten-free" value="gluten-free" />
+          <span>🌾 Gluten-Free</span>
+        </label>
+        <label class="cb-item">
+          <input type="checkbox" id="pref-halal" value="halal" />
+          <span>☪️ Halal</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="ob-section">
+      <div class="num-row">
+        <div class="num-group">
+          <label for="pref-calories">Daily Calorie Goal</label>
+          <input type="number" id="pref-calories" placeholder="e.g. 2000" min="800" max="6000" />
+        </div>
+        <div class="num-group">
+          <label for="pref-protein">Protein Goal (g)</label>
+          <input type="number" id="pref-protein" placeholder="e.g. 50" min="10" max="400" />
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-primary" onclick="savePrefs()">Let's Eat! →</button>
+  </div>
+</div>
+
+<!-- ── Header ─────────────────────────────────────────────── -->
+<header>
+  <div class="hd-logo">
+    <div class="hd-icon">🍽️</div>
+    <div>
+      <div class="hd-title">BoolaBites</div>
+      <div class="hd-sub">Yale Dining Recommender</div>
+    </div>
+  </div>
+  <div class="hd-actions">
+    <button class="hd-btn" onclick="loadAgentRecs()" title="Refresh recommendations">↻</button>
+    <button class="hd-btn" onclick="openOnboarding()" title="Edit preferences">⚙</button>
+  </div>
+</header>
+
+<!-- ── Main ───────────────────────────────────────────────── -->
+<main>
+
+  <!-- Prefs bar -->
+  <div id="prefs-bar">
+    <div class="ptags" id="ptags"></div>
+    <button class="btn-sm" onclick="openOnboarding()">Edit Preferences</button>
+  </div>
+
+  <!-- ── Agent thinking log ───────────────────────────────── -->
+  <div id="agent-log" class="hidden">
+    <div class="log-header" onclick="toggleLog()">
+      <span id="log-spinner" class="log-spinner"></span>
+      <span id="log-status">Agent is thinking…</span>
+      <span class="log-toggle" id="log-toggle">▼</span>
+    </div>
+    <div class="log-steps" id="log-steps"></div>
+  </div>
+
+  <!-- ── Recommendations ───────────────────────────────────── -->
+  <section id="recs-section">
+    <div class="sec-head">
+      <h2 class="sec-title">🍴 Today's Recommendations</h2>
+      <span class="meal-badge" id="meal-label">—</span>
+    </div>
+    <div id="loading-msg"><div class="spinner"></div>Fetching today's menu…</div>
+    <div id="error-msg" class="hidden"></div>
+    <div class="cards-grid" id="cards"></div>
+  </section>
+
+  <!-- ── AI Reasoning (collapsible) ──────────────────────── -->
+  <section id="ai-plan-section">
+    <div class="ai-plan-box">
+      <div class="ai-plan-header" onclick="toggleAiPlan()">
+        <span style="font-size:.88rem;font-weight:700;color:var(--blue)">🤖 AI Reasoning</span>
+        <span class="ai-plan-badge">MiniMax</span>
+        <span class="ai-plan-toggle" id="ai-plan-toggle">▼ Show</span>
+      </div>
+      <div id="ai-plan-body" class="collapsed">
+        <div id="ai-plan-loading" class="hidden">
+          <div class="spinner" style="width:20px;height:20px;border-width:2px;flex-shrink:0"></div>
+          Building your personalized meal combination…
+        </div>
+        <pre id="ai-plan-text"></pre>
+        <div id="ai-plan-error"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Map ───────────────────────────────────────────────── -->
+  <section id="map-section">
+    <h2 class="sec-title" style="margin-bottom:.9rem">📍 Dining Halls on Campus</h2>
+    <div class="map-wrap">
+      <iframe id="map-frame" class="map-frame"
+        src="https://maps.google.com/maps?q=Yale+University+New+Haven+CT&z=15&output=embed"
+        allowfullscreen loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade">
+      </iframe>
+      <div class="halls-strip" id="halls-strip"></div>
+      <div class="hall-preview" id="hall-preview">
+        <h4 id="preview-title">Menu Preview</h4>
+        <div class="preview-grid" id="preview-items"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ── Chat FAB ───────────────────────────────────────────── -->
+<div id="chat-fab">
+  <button class="chat-trigger" id="chat-btn" onclick="toggleChat()" title="Chat with Boo">
+    💬
+    <span class="chat-dot hidden" id="chat-dot"></span>
+  </button>
+  <div class="chat-panel" id="chat-panel">
+    <div class="chat-head">
+      <div class="chat-avatar">🐻</div>
+      <div class="chat-head-info">
+        <h3>Boo</h3>
+        <div class="chat-status">Yale dining assistant</div>
+      </div>
+      <button class="chat-close" onclick="toggleChat()">✕</button>
+    </div>
+    <div class="chat-messages" id="chat-messages"></div>
+    <div class="quick-chips" id="quick-chips"></div>
+    <div class="chat-input-row">
+      <input class="chat-input" id="chat-input" type="text" placeholder="How are you feeling today?" />
+      <button class="chat-send" onclick="sendUserMessage()">↑</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG & CONSTANTS
+   ============================================================ */
+const API = 'http://127.0.0.1:5000';
+
+const HALLS = [
+  { name:'Commons',      slug:'',                       q:'Schwarzman+Center+Yale+New+Haven+CT' },
+  { name:'Berkeley',     slug:'berkeley-college',       q:'Berkeley+College+Yale+University+New+Haven' },
+  { name:'Branford',     slug:'branford-college',       q:'Branford+College+Yale+University+New+Haven' },
+  { name:'Saybrook',     slug:'saybrook-college',       q:'Saybrook+College+Yale+University+New+Haven' },
+  { name:'TD',           slug:'timothy-dwight-college', q:'Timothy+Dwight+College+Yale+University+New+Haven' },
+  { name:'Morse',        slug:'morse-college',          q:'Morse+College+Yale+University+New+Haven' },
+  { name:'Ezra Stiles',  slug:'ezra-stiles-college',    q:'Ezra+Stiles+College+Yale+University+New+Haven' },
+  { name:'Pierson',      slug:'pierson-college',        q:'Pierson+College+Yale+University+New+Haven' },
+  { name:'Davenport',    slug:'davenport-college',      q:'Davenport+College+Yale+University+New+Haven' },
+  { name:'Trumbull',     slug:'trumbull-college',       q:'Trumbull+College+Yale+University+New+Haven' },
+  { name:'Hopper',       slug:'grace-hopper-college',   q:'Grace+Hopper+College+Yale+University+New+Haven' },
+  { name:'Pauli Murray', slug:'benjamin-franklin-college', q:'Pauli+Murray+College+Yale+University+New+Haven' },
+];
+
+const CHECKIN_HOURS = [8, 12, 18];
+
+const ENERGY_TIPS = {
+  low: {
+    default:    'Your body needs quick + sustained fuel. Look for oatmeal, lentil soup, whole-grain toast, or a banana with peanut butter.',
+    vegan:      'Try a lentil-based dish or a quinoa bowl — both are rich in iron and complex carbs for a lasting lift.',
+    vegetarian: 'A veggie grain bowl or egg dish will restore your energy. Pair with a warm broth if possible.',
+    halal:      'A warm broth-based soup with lean protein and whole grains would be ideal to restore your energy.',
+    'gluten-free': 'Go for rice, quinoa, or a protein-packed salad with beans — all naturally gluten-free energy boosters.',
+  },
+  medium: {
+    default:    "You're balanced! A protein + veggie plate will keep you steady through the rest of the day.",
+    vegan:      'A tofu or tempeh dish over brown rice keeps your energy stable. Add greens for micronutrients.',
+    vegetarian: 'A bean and veggie wrap or a grain bowl will maintain your momentum nicely.',
+    halal:      'Grilled chicken with rice and a side salad is a perfect balanced plate right now.',
+    'gluten-free': 'A rice bowl with grilled protein and roasted vegetables is a great choice.',
+  },
+  high: {
+    default:    "Great energy — keep it light! Lean protein + greens will sustain you without crashing.",
+    vegan:      'A Buddha bowl with edamame, avocado, and greens is perfect when you\'re feeling great.',
+    vegetarian: 'A light veggie stir-fry or a fresh salad with hard-boiled eggs will keep you sharp.',
+    halal:      'Grilled lean protein with a fresh salad will sustain your energy without weighing you down.',
+    'gluten-free': 'Grilled fish or chicken with a fresh garden salad is an excellent choice at peak energy.',
+  },
+};
+
+/* ============================================================
+   PREFERENCES
+   ============================================================ */
+function getPrefs() {
+  try { return JSON.parse(localStorage.getItem('jadgpt_prefs')); } catch { return null; }
+}
+
+function savePrefs() {
+  const restrictions = ['vegetarian','vegan','gluten-free','halal']
+    .filter(r => document.getElementById(`pref-${r}`)?.checked);
+  const calorie_goal = parseInt(document.getElementById('pref-calories')?.value) || 2000;
+  const protein_goal = parseInt(document.getElementById('pref-protein')?.value)  || 50;
+  const prefs = { restrictions, calorie_goal, protein_goal };
+  localStorage.setItem('jadgpt_prefs', JSON.stringify(prefs));
+  document.getElementById('onboarding').classList.add('hidden');
+  renderPrefsBar(prefs);
+  loadAgentRecs();
+}
+
+function openOnboarding() {
+  const prefs = getPrefs();
+  if (prefs) {
+    ['vegetarian','vegan','gluten-free','halal'].forEach(r => {
+      const el = document.getElementById(`pref-${r}`);
+      if (el) el.checked = prefs.restrictions?.includes(r) ?? false;
+    });
+    const cal = document.getElementById('pref-calories');
+    const pro = document.getElementById('pref-protein');
+    if (cal) cal.value = prefs.calorie_goal || '';
+    if (pro) pro.value = prefs.protein_goal || '';
+  }
+  document.getElementById('onboarding').classList.remove('hidden');
+}
+
+function renderPrefsBar(prefs) {
+  const el = document.getElementById('ptags');
+  if (!el) return;
+  const tags = prefs.restrictions?.length
+    ? prefs.restrictions.map(r => `<span class="ptag">${r}</span>`).join('')
+    : '<span class="ptag">No restrictions</span>';
+  const cal  = prefs.calorie_goal ? `<span class="ptag">${prefs.calorie_goal} kcal</span>` : '';
+  const prot = prefs.protein_goal ? `<span class="ptag">${prefs.protein_goal}g protein</span>` : '';
+  el.innerHTML = tags + cal + prot;
+}
+
+/* ============================================================
+   MEAL RECOMMENDATIONS
+   ============================================================ */
+async function loadRecs() {
+  const prefs = getPrefs();
+  if (!prefs) return;
+
+  const loading  = document.getElementById('loading-msg');
+  const errMsg   = document.getElementById('error-msg');
+  const cards    = document.getElementById('cards');
+  const mealLbl  = document.getElementById('meal-label');
+
+  loading.classList.remove('hidden');
+  errMsg.classList.add('hidden');
+  cards.innerHTML = '';
+
+  try {
+    const res = await fetch(`${API}/recommend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        restrictions: prefs.restrictions || [],
+        calorie_goal: prefs.calorie_goal || 2000,
+        protein_goal: prefs.protein_goal || 50,
+      }),
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    loading.classList.add('hidden');
+    if (mealLbl) mealLbl.textContent = cap(data.meal || 'Meal');
+
+    window._menuData = data;   // cache for map preview
+
+    if (!data.recommendations?.length) {
+      cards.innerHTML = '<p style="color:var(--gray);padding:1rem">No matching items found. Try adjusting your dietary filters.</p>';
+      return;
+    }
+
+    data.recommendations.forEach(item => {
+      cards.insertAdjacentHTML('beforeend', cardHTML(item));
+    });
+
+  } catch (err) {
+    loading.classList.add('hidden');
+    errMsg.classList.remove('hidden');
+    errMsg.innerHTML = `
+      <strong>Could not reach backend.</strong><br>
+      Make sure Flask is running: <code>cd backend && python main.py</code><br>
+      <small style="color:#999">${esc(err.message)}</small>`;
+  }
+}
+
+function cardHTML(item) {
+  const cal  = item.calories  != null ? `<span class="npill npill-cal">${Math.round(item.calories)} cal</span>` : '<span class="npill npill-na">cal N/A</span>';
+  const prot = item.protein_g != null ? `<span class="npill npill-pro">${item.protein_g}g protein</span>` : '';
+  const flags = (item.dietary_flags || []).slice(0, 3).map(f => `<span class="flag">${esc(f)}</span>`).join('');
+  return `
+    <div class="meal-card">
+      <div class="card-name">${esc(item.name)}</div>
+      <div class="card-loc">📍 ${esc(item.dining_hall)} &middot; ${esc(item.station)}</div>
+      <div class="nut-row">${cal}${prot}</div>
+      ${flags ? `<div class="flag-row">${flags}</div>` : ''}
+      <div class="card-actions">
+        <button class="card-map-btn" onclick="goToHallOnMap(${JSON.stringify(item.dining_hall)})">📍 View on map</button>
+        ${feedbackBtns(item.name, item.dining_hall)}
+      </div>
+    </div>`;
+}
+
+/* ============================================================
+   AI MEAL PLAN
+   ============================================================ */
+async function loadAiPlan() {
+  const prefs = getPrefs();
+  if (!prefs) return;
+
+  const loading = document.getElementById('ai-plan-loading');
+  const planText = document.getElementById('ai-plan-text');
+  const planErr  = document.getElementById('ai-plan-error');
+
+  loading.classList.remove('hidden');
+  planText.classList.remove('show');
+  planErr.classList.remove('show');
+
+  try {
+    const restrictions = prefs.restrictions || [];
+    const res = await fetch(`${API}/agent/recommend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        restrictions,
+        calorie_goal: prefs.calorie_goal || 2000,
+        protein_goal: prefs.protein_goal || 50,
+      }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    loading.classList.add('hidden');
+
+    if (data.error) throw new Error(data.error);
+
+    planText.textContent = data.meal_plan || '';
+    planText.classList.add('show');
+
+    // Store picks for the map
+    if (data.picks?.length) {
+      if (!window._menuData) window._menuData = {};
+      window._menuData.aiPicks = data.picks;
+      // Auto-navigate map to first pick's hall
+      goToHallOnMap(data.picks[0].dining_hall);
+    }
+  } catch (err) {
+    loading.classList.add('hidden');
+    planErr.textContent = `Could not generate AI plan: ${err.message}`;
+    planErr.classList.add('show');
+  }
+}
+
+function goToHallOnMap(diningHallName) {
+  if (!diningHallName) return;
+  const nameLower = diningHallName.toLowerCase();
+  // Find the best matching hall in the HALLS array
+  let matchIdx = HALLS.findIndex(h =>
+    nameLower.includes(h.name.toLowerCase()) ||
+    h.name.toLowerCase().includes(nameLower.split(' ')[0].toLowerCase())
+  );
+  if (matchIdx === -1) return;
+  const btn = document.querySelectorAll('.hall-btn')[matchIdx];
+  if (btn) {
+    selectHall(matchIdx, btn);
+    document.getElementById('map-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+/* ============================================================
+   MAP & DINING HALL SELECTOR
+   ============================================================ */
+function initMap() {
+  const strip = document.getElementById('halls-strip');
+  HALLS.forEach((hall, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'hall-btn';
+    btn.textContent = hall.name;
+    btn.onclick = () => selectHall(i, btn);
+    strip.appendChild(btn);
+  });
+}
+
+function selectHall(index, btn) {
+  document.querySelectorAll('.hall-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const hall = HALLS[index];
+  document.getElementById('map-frame').src =
+    `https://maps.google.com/maps?q=${hall.q}&z=17&output=embed`;
+
+  const preview = document.getElementById('hall-preview');
+  const title   = document.getElementById('preview-title');
+  const items   = document.getElementById('preview-items');
+
+  title.textContent = `${hall.name} — Today's Menu`;
+  preview.classList.add('show');
+
+  if (hall.slug) {
+    items.innerHTML = '<p style="font-size:.78rem;color:var(--gray)">Loading…</p>';
+    fetchHallPreview(hall, items);
+  } else {
+    items.innerHTML = '<p style="font-size:.78rem;color:var(--gray)">Select a dining hall above to see its menu.</p>';
+  }
+}
+
+function renderPreviewItems(el, aiPicks, restItems) {
+  let html = '';
+  if (aiPicks.length) {
+    html += `<div class="preview-section-label">⭐ AI Picks</div>`;
+    html += aiPicks.map(item => `
+      <div class="preview-row preview-row-pick">
+        <span class="preview-name">${esc(item.name)}</span>
+        <span class="preview-cal">${item.calories ? Math.round(item.calories) + ' cal' : ''}</span>
+      </div>`).join('');
+  }
+  if (restItems.length) {
+    if (aiPicks.length) html += `<div class="preview-section-label">Full Menu</div>`;
+    html += restItems.map(item => `
+      <div class="preview-row">
+        <span class="preview-name">${esc(item.name)}</span>
+        <span class="preview-cal">${item.calories ? Math.round(item.calories) + ' cal' : ''}</span>
+      </div>`).join('');
+  }
+  el.innerHTML = html || '<p style="font-size:.78rem;color:var(--gray)">No menu data available.</p>';
+}
+
+async function fetchHallPreview(hall, el) {
+  try {
+    const res = await fetch(`${API}/menu/${encodeURIComponent(hall.slug)}`);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    const allItems = Object.values(data.menu || {}).flat();
+    if (!allItems.length) { el.innerHTML = '<p style="font-size:.78rem;color:var(--gray)">No menu data available.</p>'; return; }
+
+    // Separate AI picks for this hall from the rest of the menu
+    const hallNameLower = hall.name.toLowerCase();
+    const slugMatch = hall.slug.replace('-college', '').replace(/-/g, ' ');
+    const aiPicks = (window._menuData?.picks || []).filter(x => {
+      const dh = (x.dining_hall || '').toLowerCase();
+      return dh.includes(hallNameLower) || dh.includes(slugMatch) ||
+             hallNameLower.includes((dh.split(' ')[0]) || '');
+    });
+    const aiPickNames = new Set(aiPicks.map(x => x.name.toLowerCase()));
+    const restItems = allItems.filter(x => !aiPickNames.has(x.name.toLowerCase()));
+
+    renderPreviewItems(el, aiPicks, restItems);
+  } catch {
+    el.innerHTML = '<p style="font-size:.78rem;color:var(--gray)">Menu unavailable for this hall.</p>';
+  }
+}
+
+/* ============================================================
+   CHATBOT
+   ============================================================ */
+let chatOpen       = false;
+let chatHistory    = [];   // {role:'bot'|'user', text}
+let lastCheckinKey = null;
+
+const QUICK_CHIPS_DEFAULT = [
+  { label: '⚡ Energy check-in',    fn: () => userSays('Energy check-in') },
+  { label: '🥗 Update restrictions', fn: () => userSays('Update my restrictions') },
+  { label: '🎯 Calorie goal',        fn: () => userSays('Update calorie goal') },
+  { label: '💪 Protein goal',        fn: () => userSays('Update protein goal') },
+  { label: "🍽️ What's good today?",  fn: () => userSays("What's good to eat today?") },
+];
+
+// ── Open / close ─────────────────────────────────────────────
+function toggleChat() {
+  chatOpen = !chatOpen;
+  document.getElementById('chat-panel').classList.toggle('open', chatOpen);
+  if (chatOpen) {
+    document.getElementById('chat-dot').classList.add('hidden');
+    // Flush any queued auto check-in messages
+    const queued = chatHistory.filter(m => m._queued);
+    chatHistory = chatHistory.filter(m => !m._queued);
+    if (chatHistory.length === 0) {
+      initChat();
+    } else {
+      scrollMsgs();
+    }
+    queued.forEach(m => { addBotMsg(m.text); });
+    if (queued.length) {
+      renderChips([
+        { label: '😴 Low',    fn: () => userSays('I have low energy') },
+        { label: '😊 Medium', fn: () => userSays("I'm doing okay") },
+        { label: '⚡ High',   fn: () => userSays('I have high energy') },
+      ]);
+    }
+  }
+}
+
+function initChat() {
+  const h   = new Date().getHours();
+  const ctx = h < 11 ? 'breakfast' : h < 15 ? 'lunch' : 'dinner';
+  addBotMsg(`Hey! I'm Boo 🐻 — your Yale dining assistant. It's ${ctx} time! Tell me how you're feeling, or ask me anything about today's menu.`);
+  renderChips(QUICK_CHIPS_DEFAULT);
+}
+
+// ── Message rendering ────────────────────────────────────────
+function scrollMsgs() {
+  const el = document.getElementById('chat-messages');
+  if (el) setTimeout(() => { el.scrollTop = el.scrollHeight; }, 40);
+}
+
+function nowTime() {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function addBotMsg(text, isHTML = false) {
+  chatHistory.push({ role: 'bot', text });
+  const el = document.getElementById('chat-messages');
+  if (!el) return;
+  const div = document.createElement('div');
+  div.className = 'msg msg-bot';
+  div.innerHTML = `<div class="msg-bubble">${isHTML ? text : esc(text).replace(/\n/g, '<br>')}</div>
+                   <span class="msg-time">${nowTime()}</span>`;
+  el.appendChild(div);
+  scrollMsgs();
+}
+
+function addUserMsg(text) {
+  chatHistory.push({ role: 'user', text });
+  const el = document.getElementById('chat-messages');
+  if (!el) return;
+  const div = document.createElement('div');
+  div.className = 'msg msg-user';
+  div.innerHTML = `<div class="msg-bubble">${esc(text)}</div>
+                   <span class="msg-time">${nowTime()}</span>`;
+  el.appendChild(div);
+  scrollMsgs();
+}
+
+function showTyping() {
+  const el = document.getElementById('chat-messages');
+  if (!el) return;
+  const div = document.createElement('div');
+  div.className = 'msg msg-bot'; div.id = 'typing-indicator';
+  div.innerHTML = `<div class="msg-bubble"><div class="typing-dots">
+    <div class="tdot"></div><div class="tdot"></div><div class="tdot"></div>
+  </div></div>`;
+  el.appendChild(div);
+  scrollMsgs();
+}
+function removeTyping() { document.getElementById('typing-indicator')?.remove(); }
+
+function renderChips(chips) {
+  const el = document.getElementById('quick-chips');
+  if (!el) return;
+  el.innerHTML = '';
+  chips.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.textContent = c.label;
+    b.onclick = c.fn;
+    el.appendChild(b);
+  });
+}
+function clearChips() { const el = document.getElementById('quick-chips'); if (el) el.innerHTML = ''; }
+
+// ── User sends a message ─────────────────────────────────────
+function sendUserMessage() {
+  const input = document.getElementById('chat-input');
+  const text  = input?.value?.trim();
+  if (!text) return;
+  input.value = '';
+  userSays(text);
+}
+
+function userSays(text) {
+  addUserMsg(text);
+  clearChips();
+  showTyping();
+  setTimeout(() => { removeTyping(); processMessage(text); }, 500 + Math.random() * 350);
+}
+
+// ── Intent detection ─────────────────────────────────────────
+function detectIntent(msg) {
+  const m = msg.toLowerCase();
+  if (/\b(hi|hello|hey|hiya|sup|yo)\b/.test(m))                                               return 'greeting';
+  if (/\b(help|what can you do|capabilities|commands)\b/.test(m))                             return 'help';
+  if (/\b(tired|exhausted|low energy|no energy|sleepy|drained|fatigued|sluggish)\b/.test(m)) return 'energy_low';
+  if (/\b(high energy|energized|pumped|great|amazing|fantastic|feel good|on fire)\b/.test(m)) return 'energy_high';
+  if (/\b(medium|okay|ok|fine|alright|not bad|so.so|meh|average|neutral)\b/.test(m))         return 'energy_medium';
+  if (/\b(sick|nausea|stomach|not.*well|under the weather|headache|queasy|ill)\b/.test(m))   return 'feeling_sick';
+  if (/\b(stress|anxious|overwhelm|nervous|worry|worried|panic|pressure)\b/.test(m))         return 'feeling_stressed';
+  if (/\b(workout|gym|exercise|ran|run|lifting|weights|training|crossfit)\b/.test(m))        return 'post_workout';
+  if (/\b(starving|famished|ravenous|very hungry|super hungry|dying of hunger)\b/.test(m))   return 'very_hungry';
+  if (/\b(not hungry|not that hungry|small meal|snack|light meal|just a bite)\b/.test(m))    return 'not_hungry';
+  if (/\b(celebrat|happy|excited|good mood|treat yourself|deserv)\b/.test(m))                return 'celebrating';
+  if (/\b(sad|down|blue|depressed|unhappy|lonely|rough day)\b/.test(m))                      return 'feeling_down';
+  if (/\b(remove|no longer|can eat|stop being|not (vegan|vegetarian|halal|gluten.free))\b/.test(m)) return 'remove_restriction';
+  if (/\b(vegan|vegetarian|gluten.free|halal)\b/.test(m))                                    return 'update_restriction';
+  if (/\b(\d{3,4})\s*(cal|calorie|kcal)/.test(m))                                            return 'update_calories';
+  if (/\b(\d{2,3})\s*g?\s*(protein|grams of protein)/.test(m))                              return 'update_protein';
+  if (/\bupdate.*(calorie|caloric|calories)\b/.test(m))                                      return 'ask_calories';
+  if (/\bupdate.*protein\b/.test(m))                                                          return 'ask_protein';
+  if (/\bupdate.*(restriction|diet|dietary)\b/.test(m))                                      return 'ask_restriction';
+  if (/\b(energy check.?in|check.?in)\b/.test(m))                                            return 'energy_checkin';
+  if (/\b(what.*good|suggest|recommend|best.*today|what.*eat|what.*have|meal.*today)\b/.test(m)) return 'recommend';
+  return 'unknown';
+}
+
+// ── Response generation ──────────────────────────────────────
+function processMessage(text) {
+  const prefs  = getPrefs() || { restrictions: [], calorie_goal: 2000, protein_goal: 50 };
+  const intent = detectIntent(text);
+
+  switch (intent) {
+    case 'greeting':
+      addBotMsg("Hey! Great to hear from you. I can help with energy check-ins, meal suggestions, or updating your preferences. What's on your mind?");
+      renderChips(QUICK_CHIPS_DEFAULT);
+      break;
+
+    case 'help':
+      addBotMsg(
+        "Here's what I can do:\n" +
+        "• ⚡ Energy check-in — tell me how you feel\n" +
+        "• 🍽️ Meal suggestions — ask what's good today\n" +
+        "• 🥗 Dietary restrictions — add/remove vegan, halal, etc.\n" +
+        "• 🎯 Calorie & protein goals — just say the number\n" +
+        "• 😴 Mood-based meals — tired, stressed, post-workout?"
+      );
+      renderChips(QUICK_CHIPS_DEFAULT);
+      break;
+
+    case 'energy_checkin':
+      addBotMsg("How are your energy levels right now?");
+      renderChips([
+        { label: '😴 Low',    fn: () => userSays('I have low energy') },
+        { label: '😊 Medium', fn: () => userSays("I'm doing okay") },
+        { label: '⚡ High',   fn: () => userSays('I have high energy') },
+      ]);
+      break;
+
+    case 'energy_low':
+      saveEnergyEntry('low');
+      showTyping();
+      askAgentChat(text, () => {
+        removeTyping();
+        addBotMsg("Low energy? Let's fuel up! 💪\n\n" + getEnergyTip('low', prefs));
+        showMenuSuggestions('energy', prefs);
+      });
+      break;
+
+    case 'energy_medium':
+      saveEnergyEntry('medium');
+      showTyping();
+      askAgentChat(text, () => {
+        removeTyping();
+        addBotMsg("Sounds balanced! Here's how to stay steady:\n\n" + getEnergyTip('medium', prefs));
+        showMenuSuggestions('balanced', prefs);
+      });
+      break;
+
+    case 'energy_high':
+      saveEnergyEntry('high');
+      showTyping();
+      askAgentChat(text, () => {
+        removeTyping();
+        addBotMsg("You're crushing it! ⚡\n\n" + getEnergyTip('high', prefs));
+        showMenuSuggestions('light', prefs);
+      });
+      break;
+
+    case 'feeling_sick':
+      addBotMsg("Sorry you're not feeling well 🤒 Gentle options are best: plain rice, broth soups, toast, or bananas. Avoid anything fried or spicy. Stay hydrated!");
+      renderChips([{ label: '🍵 Soups available today', fn: () => userSays('What soups are available today?') }]);
+      break;
+
+    case 'feeling_stressed':
+      addBotMsg("Exam season is brutal 📚 Foods that genuinely help with stress: oats, dark chocolate, nuts, and leafy greens. Avoid excess caffeine — it amplifies anxiety. A balanced meal will help you focus.");
+      showMenuSuggestions('balanced', prefs);
+      break;
+
+    case 'post_workout':
+      addBotMsg("Nice work! 💪 Aim for protein + carbs within 45 min post-workout — ideally 25–40g protein with complex carbs to aid muscle recovery.");
+      showMenuSuggestions('high_protein', prefs);
+      break;
+
+    case 'very_hungry':
+      addBotMsg("Hungry Yale student alert! 🍽️ Here are today's most filling options:");
+      showMenuSuggestions('filling', prefs);
+      break;
+
+    case 'not_hungry':
+      addBotMsg("No problem — here are some lighter picks from today's menu:");
+      showMenuSuggestions('light', prefs);
+      break;
+
+    case 'celebrating':
+      addBotMsg("Something to celebrate?! 🎉 You deserve a treat. Life's too short not to enjoy dining hall dessert occasionally. Here are some feel-good picks:");
+      showMenuSuggestions('popular', prefs);
+      break;
+
+    case 'feeling_down':
+      addBotMsg("Sending good vibes 💙 Sometimes comfort food is exactly what's needed. Here are some hearty, feel-good options:");
+      showMenuSuggestions('comfort', prefs);
+      break;
+
+    case 'update_restriction': {
+      const found = text.match(/\b(vegan|vegetarian|gluten.free|gluten free|halal)\b/i);
+      if (found) {
+        const r = found[0].toLowerCase().replace(/\s+/g, '-');
+        const current = prefs.restrictions || [];
+        if (current.includes(r)) {
+          addBotMsg(`"${r}" is already in your preferences. Want to remove it instead?`);
+          renderChips([
+            { label: `Remove ${r}`, fn: () => removeRestriction(r) },
+            { label: 'Keep it',     fn: () => { addBotMsg("Okay, keeping it!"); renderChips(QUICK_CHIPS_DEFAULT); } },
+          ]);
+        } else {
+          addRestriction(r);
+        }
+      } else {
+        addBotMsg("Which restriction would you like to add?");
+        renderChips([
+          { label: '🌱 Vegan',       fn: () => addRestriction('vegan') },
+          { label: '🥦 Vegetarian',  fn: () => addRestriction('vegetarian') },
+          { label: '🌾 Gluten-Free', fn: () => addRestriction('gluten-free') },
+          { label: '☪️ Halal',        fn: () => addRestriction('halal') },
+        ]);
+      }
+      break;
+    }
+
+    case 'remove_restriction': {
+      const found = text.match(/\b(vegan|vegetarian|gluten.free|gluten free|halal)\b/i);
+      if (found) {
+        removeRestriction(found[0].toLowerCase().replace(/\s+/g, '-'));
+      } else {
+        const current = prefs.restrictions || [];
+        if (!current.length) {
+          addBotMsg("You don't have any restrictions set right now.");
+          renderChips(QUICK_CHIPS_DEFAULT);
+        } else {
+          addBotMsg("Which restriction would you like to remove?");
+          renderChips(current.map(r => ({ label: `Remove ${r}`, fn: () => removeRestriction(r) })));
+        }
+      }
+      break;
+    }
+
+    case 'update_calories': {
+      const m = text.match(/\b(\d{3,4})\s*(cal|calorie|kcal)/i);
+      if (m) {
+        const cal = parseInt(m[1]);
+        updatePrefsField('calorie_goal', cal);
+        addBotMsg(`Done! Calorie goal updated to ${cal} kcal/day ✅  Refreshing your recommendations…`);
+        setTimeout(loadAgentRecs, 900);
+        renderChips(QUICK_CHIPS_DEFAULT);
+      }
+      break;
+    }
+
+    case 'update_protein': {
+      const m = text.match(/\b(\d{2,3})\s*g?\s*(protein|grams)/i);
+      if (m) {
+        const prot = parseInt(m[1]);
+        updatePrefsField('protein_goal', prot);
+        addBotMsg(`Got it! Protein goal updated to ${prot}g/day ✅  Refreshing your recommendations…`);
+        setTimeout(loadAgentRecs, 900);
+        renderChips(QUICK_CHIPS_DEFAULT);
+      }
+      break;
+    }
+
+    case 'ask_calories':
+      addBotMsg("What would you like your daily calorie goal to be? (e.g. type \"1800 calories\")");
+      break;
+
+    case 'ask_protein':
+      addBotMsg("What's your protein goal in grams? (e.g. type \"120g protein\")");
+      break;
+
+    case 'ask_restriction':
+      addBotMsg("What would you like to change?");
+      renderChips([
+        { label: '🌱 Add Vegan',        fn: () => addRestriction('vegan') },
+        { label: '🥦 Add Vegetarian',   fn: () => addRestriction('vegetarian') },
+        { label: '🌾 Add Gluten-Free',  fn: () => addRestriction('gluten-free') },
+        { label: '☪️ Add Halal',         fn: () => addRestriction('halal') },
+        { label: '🚫 Clear all',         fn: () => clearRestrictions() },
+      ]);
+      break;
+
+    case 'recommend':
+      showTyping();
+      askAgentChat(text, () => {
+        removeTyping();
+        addBotMsg("Here are today's top picks based on your profile:");
+        showMenuSuggestions('top', prefs);
+      });
+      break;
+
+    default:
+      showTyping();
+      askAgentChat(text, () => {
+        removeTyping();
+        addBotMsg("I'm not sure I caught that — but I'm here to help! Try asking about energy, meal suggestions, or updating your preferences.");
+        renderChips(QUICK_CHIPS_DEFAULT);
+      });
+  }
+}
+
+// ── Preference helpers ────────────────────────────────────────
+function updatePrefsField(key, value) {
+  const prefs = getPrefs() || { restrictions: [], calorie_goal: 2000, protein_goal: 50 };
+  prefs[key] = value;
+  localStorage.setItem('jadgpt_prefs', JSON.stringify(prefs));
+  renderPrefsBar(prefs);
+}
+
+function addRestriction(r) {
+  const prefs = getPrefs() || { restrictions: [], calorie_goal: 2000, protein_goal: 50 };
+  if (!prefs.restrictions.includes(r)) {
+    prefs.restrictions.push(r);
+    localStorage.setItem('jadgpt_prefs', JSON.stringify(prefs));
+    renderPrefsBar(prefs);
+    addBotMsg(`"${r}" added to your restrictions ✅  Refreshing recommendations…`);
+    setTimeout(loadAgentRecs, 900);
+  }
+  renderChips(QUICK_CHIPS_DEFAULT);
+}
+
+function removeRestriction(r) {
+  const prefs = getPrefs() || { restrictions: [], calorie_goal: 2000, protein_goal: 50 };
+  prefs.restrictions = prefs.restrictions.filter(x => x !== r);
+  localStorage.setItem('jadgpt_prefs', JSON.stringify(prefs));
+  renderPrefsBar(prefs);
+  addBotMsg(`Removed "${r}" from your restrictions ✅  Refreshing…`);
+  setTimeout(loadAgentRecs, 900);
+  renderChips(QUICK_CHIPS_DEFAULT);
+}
+
+function clearRestrictions() {
+  const prefs = getPrefs() || { restrictions: [], calorie_goal: 2000, protein_goal: 50 };
+  prefs.restrictions = [];
+  localStorage.setItem('jadgpt_prefs', JSON.stringify(prefs));
+  renderPrefsBar(prefs);
+  addBotMsg("All dietary restrictions cleared ✅  Refreshing recommendations…");
+  setTimeout(loadAgentRecs, 900);
+  renderChips(QUICK_CHIPS_DEFAULT);
+}
+
+// ── Inline menu suggestions ───────────────────────────────────
+function showMenuSuggestions(mode, prefs) {
+  let items = [...(window._menuData?.picks || window._menuData?.recommendations || [])];
+
+  if      (mode === 'high_protein') items = items.filter(x => (x.protein_g || 0) >= 15).sort((a,b) => (b.protein_g||0)-(a.protein_g||0));
+  else if (mode === 'light')        items = items.filter(x => x.calories && x.calories < 320).sort((a,b) => (a.calories||999)-(b.calories||999));
+  else if (mode === 'filling')      items = items.filter(x => x.calories && x.calories >= 400).sort((a,b) => (b.calories||0)-(a.calories||0));
+  else if (mode === 'energy')       items = items.filter(x => (x.protein_g||0) >= 8 && (x.calories||0) >= 200).sort((a,b) => (b.protein_g||0)-(a.protein_g||0));
+  else                              items = items.sort((a,b) => (b.protein_g||0)-(a.protein_g||0));
+
+  const top = items.slice(0, 3);
+  if (!top.length) {
+    addBotMsg("I don't have today's menu cached yet — check the Recommendations section above after it loads!");
+    renderChips(QUICK_CHIPS_DEFAULT);
+    return;
+  }
+
+  const html = top.map(item => {
+    const cal  = item.calories  ? `${Math.round(item.calories)} cal` : '';
+    const prot = item.protein_g ? `${item.protein_g}g protein` : '';
+    const stats = [cal, prot].filter(Boolean).join(' · ');
+    return `<div class="chat-item-row">
+      <strong>${esc(item.name)}</strong><br>
+      <span style="font-size:.71rem;color:var(--gray)">${esc(item.dining_hall)} — ${stats}</span>
+    </div>`;
+  }).join('');
+  addBotMsg(html, true);
+  renderChips(QUICK_CHIPS_DEFAULT);
+}
+
+// ── Energy tips (reused from existing data) ───────────────────
+function getEnergyTip(level, prefs) {
+  const tips = ENERGY_TIPS[level];
+  const r    = prefs?.restrictions || [];
+  if (r.includes('vegan'))        return tips.vegan;
+  if (r.includes('vegetarian'))   return tips.vegetarian;
+  if (r.includes('halal'))        return tips.halal;
+  if (r.includes('gluten-free'))  return tips['gluten-free'];
+  return tips.default;
+}
+
+// ── Auto check-in notification ────────────────────────────────
+function checkAutoCheckin() {
+  const now = new Date();
+  const h   = now.getHours();
+  const m   = now.getMinutes();
+  const key = `${now.toDateString()}-${h}`;
+  if (CHECKIN_HOURS.includes(h) && m < 5 && key !== lastCheckinKey) {
+    lastCheckinKey = key;
+    if (!chatOpen) {
+      document.getElementById('chat-dot').classList.remove('hidden');
+      // Queue a check-in message for when the user opens the chat
+      const ctx = h < 11 ? 'breakfast' : h < 15 ? 'lunch' : 'dinner';
+      chatHistory.push({ role: 'bot', _queued: true,
+        text: `It's ${ctx} time! ⏰ How are your energy levels today?` });
+    }
+  }
+}
+
+/* ============================================================
+   ENERGY HISTORY
+   ============================================================ */
+const ENERGY_HISTORY_KEY = 'boolabites_energy_history';
+
+function getEnergyHistory() {
+  try { return JSON.parse(localStorage.getItem(ENERGY_HISTORY_KEY)) || []; }
+  catch { return []; }
+}
+
+function saveEnergyEntry(level) {
+  const history = getEnergyHistory();
+  history.push({ level, time: new Date().toISOString() });
+  if (history.length > 20) history.splice(0, history.length - 20);
+  localStorage.setItem(ENERGY_HISTORY_KEY, JSON.stringify(history));
+}
+
+function buildEnergyContext() {
+  const history = getEnergyHistory();
+  return history.length ? history.slice(-6) : null;
+}
+
+/* ============================================================
+   AGENT LOG UI
+   ============================================================ */
+function toggleLog() {
+  const steps  = document.getElementById('log-steps');
+  const toggle = document.getElementById('log-toggle');
+  if (!steps || !toggle) return;
+  const open = steps.classList.toggle('open');
+  toggle.classList.toggle('open', open);
+}
+
+function clearLogSteps() {
+  const el = document.getElementById('log-steps');
+  if (el) el.innerHTML = '';
+}
+
+function appendLogStep(icon, name, detail) {
+  const steps = document.getElementById('log-steps');
+  if (!steps) return;
+  const div = document.createElement('div');
+  div.className = 'log-step';
+  div.innerHTML = `<em class="log-step-icon">${icon}</em><span class="log-step-name">${esc(name)}</span><span class="log-step-detail">${esc(detail)}</span>`;
+  steps.appendChild(div);
+  steps.classList.add('open');
+  document.getElementById('log-toggle')?.classList.add('open');
+}
+
+function setLogStatus(text, spinning) {
+  const s  = document.getElementById('log-status');
+  const sp = document.getElementById('log-spinner');
+  if (s)  s.textContent = text;
+  if (sp) sp.style.display = spinning ? '' : 'none';
+}
+
+/* ============================================================
+   AGENT RECOMMENDATIONS
+   ============================================================ */
+const TOOL_ICONS = { get_menu: '🍽️', get_nutrition: '🔬', check_user_goals: '🎯', send_recommendation: '✅' };
+
+async function loadAgentRecs() {
+  const prefs = getPrefs();
+  if (!prefs) return;
+
+  const agentLog  = document.getElementById('agent-log');
+  const loading   = document.getElementById('loading-msg');
+  const errMsg    = document.getElementById('error-msg');
+  const cards     = document.getElementById('cards');
+  const mealLbl   = document.getElementById('meal-label');
+  const planText  = document.getElementById('ai-plan-text');
+  const planErr   = document.getElementById('ai-plan-error');
+
+  agentLog.classList.remove('hidden');
+  clearLogSteps();
+  setLogStatus('Agent is thinking…', true);
+  loading.classList.remove('hidden');
+  errMsg.classList.add('hidden');
+  cards.innerHTML = '';
+  planText?.classList.remove('show');
+  planErr?.classList.remove('show');
+
+  // Collapse AI reasoning panel while new results load
+  document.getElementById('ai-plan-body')?.classList.add('collapsed');
+  const toggleEl = document.getElementById('ai-plan-toggle');
+  if (toggleEl) toggleEl.textContent = '▼ Show';
+
+  const { liked, disliked } = buildFeedbackContext();
+
+  try {
+    const res = await fetch(`${API}/agent/recommend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        restrictions:   prefs.restrictions || [],
+        calorie_goal:   prefs.calorie_goal || 2000,
+        protein_goal:   prefs.protein_goal || 50,
+        energy_history: buildEnergyContext(),
+        liked_items:    liked,
+        disliked_items: disliked,
+      }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    loading.classList.add('hidden');
+
+    if (data.error) throw new Error(data.error);
+
+    if (mealLbl) mealLbl.textContent = cap(data.meal || 'Meal');
+
+    (data.tool_log || []).forEach(s =>
+      appendLogStep(TOOL_ICONS[s.tool] || '⚙️', s.tool.replace(/_/g, ' '), s.summary || '')
+    );
+    setLogStatus('Done — recommendations ready', false);
+
+    // Store for map preview and chatbot suggestions
+    window._menuData = data;
+    // Normalise so showMenuSuggestions works regardless of call path
+    if (!window._menuData.recommendations) {
+      window._menuData.recommendations = data.picks || [];
+    }
+
+    // Populate collapsible AI reasoning panel
+    if (data.meal_plan && planText) {
+      planText.textContent = data.meal_plan;
+      planText.classList.add('show');
+    }
+
+    // Render picks as primary recommendation cards
+    const picks = data.picks || [];
+    if (!picks.length) {
+      cards.insertAdjacentHTML('beforeend',
+        '<p style="color:var(--gray);padding:1rem">No matching items found. Try adjusting your dietary filters.</p>');
+      return;
+    }
+
+    picks.forEach(item => cards.insertAdjacentHTML('beforeend', agentCardHTML(item)));
+
+    // Auto-navigate map to first pick's hall
+    if (picks[0]?.dining_hall) goToHallOnMap(picks[0].dining_hall);
+
+  } catch {
+    loading.classList.add('hidden');
+    agentLog.classList.add('hidden');
+    loadRecs();
+  }
+}
+
+/* ============================================================
+   FEEDBACK (taste profile)
+   ============================================================ */
+const FEEDBACK_KEY = 'boolabites_feedback';
+
+function getFeedback() {
+  try { return JSON.parse(localStorage.getItem(FEEDBACK_KEY)) || {}; }
+  catch { return {}; }
+}
+
+function saveFeedback(feedback) {
+  localStorage.setItem(FEEDBACK_KEY, JSON.stringify(feedback));
+}
+
+function rateDish(name, hall, liked, btn) {
+  const feedback = getFeedback();
+  const key = `${name}@${hall}`;
+  feedback[key] = { name, hall, liked, date: new Date().toISOString().slice(0, 10) };
+  // Prune to last 30 entries by date
+  const entries = Object.entries(feedback)
+    .sort((a, b) => (a[1].date > b[1].date ? 1 : -1));
+  if (entries.length > 30) entries.splice(0, entries.length - 30);
+  saveFeedback(Object.fromEntries(entries));
+  // Update button states
+  const btns = btn.closest('.feedback-btns')?.querySelectorAll('.fb-btn');
+  btns?.forEach(b => b.classList.remove('active-like', 'active-dislike'));
+  btn.classList.add(liked ? 'active-like' : 'active-dislike');
+}
+
+function buildFeedbackContext() {
+  const entries = Object.values(getFeedback());
+  return {
+    liked:    entries.filter(e => e.liked === true ).map(e => e.name),
+    disliked: entries.filter(e => e.liked === false).map(e => e.name),
+  };
+}
+
+function feedbackBtns(name, hall) {
+  const fb  = getFeedback()[`${name}@${hall}`];
+  const likeClass    = fb?.liked === true  ? ' active-like'    : '';
+  const dislikeClass = fb?.liked === false ? ' active-dislike' : '';
+  return `<div class="feedback-btns">
+    <button class="fb-btn${likeClass}"    onclick="rateDish(${JSON.stringify(name)},${JSON.stringify(hall)},true,this)"  title="Liked this">👍</button>
+    <button class="fb-btn${dislikeClass}" onclick="rateDish(${JSON.stringify(name)},${JSON.stringify(hall)},false,this)" title="Not for me">👎</button>
+  </div>`;
+}
+
+/* ── AI reasoning toggle ──────────────────────────────────── */
+function toggleAiPlan() {
+  const body   = document.getElementById('ai-plan-body');
+  const toggle = document.getElementById('ai-plan-toggle');
+  if (!body) return;
+  const collapsed = body.classList.toggle('collapsed');
+  if (toggle) toggle.textContent = collapsed ? '▼ Show' : '▲ Hide';
+}
+
+function agentCardHTML(item) {
+  const cal    = item.calories  != null ? `<span class="npill npill-cal">${Math.round(item.calories)} cal</span>` : '<span class="npill npill-na">cal N/A</span>';
+  const prot   = item.protein_g != null ? `<span class="npill npill-pro">${item.protein_g}g protein</span>` : '';
+  const flags  = (item.dietary_flags || []).slice(0, 3).map(f => `<span class="flag">${esc(f)}</span>`).join('');
+  const reason = item.reason ? `<div class="card-reason">💡 ${esc(item.reason)}</div>` : '';
+  return `
+    <div class="meal-card">
+      <div class="card-name">${esc(item.name)}</div>
+      <div class="card-loc">📍 ${esc(item.dining_hall)} &middot; ${esc(item.station)}</div>
+      <div class="nut-row">${cal}${prot}</div>
+      ${flags ? `<div class="flag-row">${flags}</div>` : ''}
+      ${reason}
+      <div class="card-actions">
+        <button class="card-map-btn" onclick="goToHallOnMap(${JSON.stringify(item.dining_hall)})">📍 View on map</button>
+        ${feedbackBtns(item.name, item.dining_hall)}
+      </div>
+    </div>`;
+}
+
+/* ── Agent chat ──────────────────────────────────────────────── */
+async function askAgentChat(text, fallbackFn) {
+  const prefs = getPrefs() || { restrictions: [], calorie_goal: 2000, protein_goal: 50 };
+  try {
+    const res = await fetch(`${API}/agent/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message:        text,
+        restrictions:   prefs.restrictions || [],
+        calorie_goal:   prefs.calorie_goal || 2000,
+        protein_goal:   prefs.protein_goal || 50,
+        energy_history: buildEnergyContext(),
+      }),
+    });
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    removeTyping();
+    if (data.fallback || !data.reply) { fallbackFn?.(); return; }
+    if (data.tool_log?.length) {
+      const stepsHtml = data.tool_log.map(s =>
+        `<div style="font-size:.68rem;color:var(--gray);padding:.08rem 0">${TOOL_ICONS[s.tool] || '⚙️'} <b>${s.tool.replace(/_/g, ' ')}</b>: ${esc(s.summary || '')}</div>`
+      ).join('');
+      addBotMsg(
+        `<div style="border-left:2px solid var(--border);padding-left:.6rem;margin-bottom:.4rem;opacity:.85">${stepsHtml}</div>` +
+        esc(data.reply).replace(/\n/g, '<br>'),
+        true
+      );
+    } else {
+      addBotMsg(data.reply);
+    }
+    renderChips(QUICK_CHIPS_DEFAULT);
+  } catch {
+    removeTyping();
+    fallbackFn?.();
+  }
+}
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+document.addEventListener('DOMContentLoaded', () => {
+  const prefs = getPrefs();
+
+  if (!prefs) {
+    document.getElementById('onboarding').classList.remove('hidden');
+  } else {
+    document.getElementById('onboarding').classList.add('hidden');
+    renderPrefsBar(prefs);
+    loadAgentRecs();
+  }
+
+  initMap();
+  setInterval(checkAutoCheckin, 60_000);
+  checkAutoCheckin();
+
+  // Enter key in chat input
+  document.getElementById('chat-input')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') sendUserMessage();
+  });
+});
+</script>
+</body>
+</html>
