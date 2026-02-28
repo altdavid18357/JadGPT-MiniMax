@@ -832,31 +832,7 @@ function selectHall(index, btn) {
   title.textContent = `${hall.name} — Today's Menu`;
   preview.classList.add('show');
 
-  // Prefer AI picks for this hall, then fall back to cached recommendations
-  const hallNameLower = hall.name.toLowerCase();
-  const slugMatch = hall.slug.replace('-college', '').replace(/-/g, ' ');
-
-  const aiPicks = (window._menuData?.aiPicks || []).filter(x =>
-    x.dining_hall?.toLowerCase().includes(hallNameLower) ||
-    x.dining_hall?.toLowerCase().includes(slugMatch)
-  );
-
-  if (aiPicks.length > 0) {
-    title.textContent = `${hall.name} — AI Picks ✨`;
-    renderPreviewItems(items, aiPicks);
-    preview.classList.add('show');
-    return;
-  }
-
-  const cached = window._menuData?.recommendations || [];
-  const local = cached.filter(x =>
-    x.dining_hall?.toLowerCase().includes(slugMatch) ||
-    x.dining_hall?.toLowerCase().includes(hallNameLower)
-  ).slice(0, 6);
-
-  if (local.length > 0) {
-    renderPreviewItems(items, local);
-  } else if (hall.slug) {
+  if (hall.slug) {
     items.innerHTML = '<p style="font-size:.78rem;color:var(--gray)">Loading…</p>';
     fetchHallPreview(hall, items);
   } else {
@@ -877,7 +853,7 @@ async function fetchHallPreview(hall, el) {
     const res = await fetch(`${API}/menu/${encodeURIComponent(hall.slug)}`);
     if (!res.ok) throw new Error();
     const data = await res.json();
-    const allItems = Object.values(data.menu || {}).flat().slice(0, 6);
+    const allItems = Object.values(data.menu || {}).flat();
     if (!allItems.length) { el.innerHTML = '<p style="font-size:.78rem;color:var(--gray)">No menu data available.</p>'; return; }
     renderPreviewItems(el, allItems);
   } catch {

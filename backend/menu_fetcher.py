@@ -154,7 +154,9 @@ def _fetch_raw(url: str) -> dict:
         return {}
 
 
-def _parse_menu(raw: dict, target_date: str) -> Dict[str, List[dict]]:
+_BREAKFAST_SKIP_STATIONS = {"smartmeals", "smart meals"}
+
+def _parse_menu(raw: dict, target_date: str, meal: str = "") -> Dict[str, List[dict]]:
     """Parse Nutrislice response into {station: [items]} for target_date."""
     menu: Dict[str, List[dict]] = {}
     current_station = "General"
@@ -167,6 +169,9 @@ def _parse_menu(raw: dict, target_date: str) -> Dict[str, List[dict]]:
                 current_station = item["text"]
                 menu.setdefault(current_station, [])
             elif item.get("food") and item["food"].get("name"):
+                # SmartMeals is a lunch/dinner-only offering — skip it at breakfast
+                if meal == "breakfast" and current_station.lower().strip() in _BREAKFAST_SKIP_STATIONS:
+                    continue
                 food = item["food"]
                 nut  = food.get("rounded_nutrition_info") or {}
                 flags = [
@@ -196,9 +201,9 @@ def _parse_menu(raw: dict, target_date: str) -> Dict[str, List[dict]]:
 
 
 def _fetch_hall(args: Tuple) -> Tuple[str, Dict[str, List[dict]]]:
-    hall_name, url, target_date = args
+    hall_name, url, target_date, meal = args
     raw  = _fetch_raw(url)
-    menu = _parse_menu(raw, target_date)
+    menu = _parse_menu(raw, target_date, meal)
     return hall_name, menu
 
 
@@ -228,7 +233,7 @@ def fetch_all_menus(verbose: bool = True) -> Tuple[str, Dict[str, Dict[str, List
         if not template:
             continue
         url = NUTRISLICE_BASE + template.format(year=year, month=month, day=day)
-        tasks.append((school["name"], url, target_date))
+        tasks.append((school["name"], url, target_date, meal))
 
     all_menus: Dict[str, Dict[str, List[dict]]] = {}
 
@@ -265,7 +270,7 @@ def _fetch_all_menus_legacy(
         print(f"[fallback] Fetching {meal} menus from {len(_FALLBACK_HALLS)} halls...")
 
     tasks = [
-        (name, f"{base}/{slug}/menu-type/{meal}/{date_str}/", target_date)
+        (name, f"{base}/{slug}/menu-type/{meal}/{date_str}/", target_date, meal)
         for name, slug in _FALLBACK_HALLS.items()
     ]
 
