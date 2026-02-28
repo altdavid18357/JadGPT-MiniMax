@@ -8,7 +8,7 @@ An AI-powered meal planner for Yale dining halls. BoolaBites fetches live menus 
 
 - **Live menu data** — Pulls real-time menus from 12+ Yale dining halls via the Nutrislice API
 - **AI meal planner** — MiniMax agent with tool use assembles portion-aware meal combinations
-- **Dietary restriction enforcement** — Vegan, vegetarian, gluten-free, halal, kosher, dairy-free, nut-free
+- **Dietary restriction enforcement** — Vegan, vegetarian, gluten-free, halal
 - **Nutritional targeting** — Hits your daily calorie and protein goals (~1/3 per meal)
 - **BM25 search** — Fast keyword retrieval without an external vector database
 - **Multi-hall recommendations** — Picks the best dishes across all open dining halls
@@ -193,12 +193,12 @@ AI-powered meal plan. The MiniMax agent uses tools to search and filter the menu
 ```
 🍽️ YOUR MEAL PLATE:
 1. [Dish] — [portion]
-   📍 [Hall] · [Station]
+   [Hall] · [Station]
    Nutrition: [X] cal | [Y]g protein
 
-📊 COMBINED: [total] cal | [total]g protein
-💡 TIP: [Practical advice]
-⚠️ NOTE: [Allergy warning if relevant]
+COMBINED: [total] cal | [total]g protein
+TIP: [Practical advice]
+NOTE: [Allergy warning if relevant]
 ```
 
 ---
@@ -221,9 +221,3 @@ AI-powered meal plan. The MiniMax agent uses tools to search and filter the menu
 Benjamin Franklin · Branford · Davenport · Jonathan Edwards · Berkeley · Pierson · Saybrook · Silliman · Timothy Dwight · Trumbull · Ezra Stiles · Morse
 
 Hall availability is discovered dynamically from the Nutrislice schools API, with the above list as a fallback.
-
----
-
-## License
-
-MIT License — see [LICENSE](LICENSE).
