@@ -55,6 +55,8 @@ def recommend():
 
     calorie_goal = int(body.get("calorie_goal", 2000))
     protein_goal = int(body.get("protein_goal", 50))
+    limit        = int(body.get("limit", 3))
+    exclude      = {n.lower().strip() for n in (body.get("exclude") or [])}
 
     meal, all_menus = _get_menus()
 
@@ -82,12 +84,14 @@ def recommend():
     # Rank by protein content (descending); items with no data sink to bottom
     results.sort(key=lambda x: (x.get("protein_g") or 0), reverse=True)
 
-    # Pick the best unique-named item per dining hall, then return top 3 halls
+    # Pick the best unique-named item per dining hall, excluding requested names
     hall_top: dict = {}
     seen_names: set = set()
     for item in results:
         hall = item["dining_hall"]
         key = item["name"].lower().strip()
+        if key in exclude:
+            continue
         if hall not in hall_top and key not in seen_names:
             hall_top[hall] = item
             seen_names.add(key)
@@ -96,7 +100,7 @@ def recommend():
         hall_top.values(),
         key=lambda x: x.get("protein_g") or 0,
         reverse=True,
-    )[:3]
+    )[:limit]
 
     return jsonify({
         "meal":            meal,

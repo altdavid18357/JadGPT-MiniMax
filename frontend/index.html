@@ -286,6 +286,19 @@
     .fb-btn.active-like    { background: var(--pro-bg); border-color: var(--pro-fg); }
     .fb-btn.active-dislike { background: #FEE2E2; border-color: #EF4444; }
 
+    /* Toast notification */
+    .toast {
+      position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(2rem);
+      background: #1a1a2e; color: #fff; padding: .55rem 1.2rem; border-radius: 2rem;
+      font-size: .85rem; font-weight: 600; opacity: 0; transition: opacity .25s, transform .25s;
+      z-index: 9999; pointer-events: none; white-space: nowrap;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* Card swap fade */
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .meal-card.new-card { animation: fadeIn .3s ease; }
+
     /* Map AI pick highlight */
     .preview-row-pick {
       background: var(--blue-light); border-radius: 5px;
@@ -509,7 +522,7 @@
     </div>
   </div>
   <div class="hd-actions">
-    <button class="hd-btn" onclick="loadAgentRecs()" title="Refresh recommendations">↻</button>
+    <button class="hd-btn" onclick="loadRecs()" title="Refresh recommendations">↻</button>
     <button class="hd-btn" onclick="openOnboarding()" title="Edit preferences">⚙</button>
   </div>
 </header>
@@ -669,7 +682,7 @@ function savePrefs() {
   localStorage.setItem('jadgpt_prefs', JSON.stringify(prefs));
   document.getElementById('onboarding').classList.add('hidden');
   renderPrefsBar(prefs);
-  loadAgentRecs();
+  loadRecs();
 }
 
 function openOnboarding() {
@@ -713,6 +726,7 @@ async function loadRecs() {
   loading.classList.remove('hidden');
   errMsg.classList.add('hidden');
   cards.innerHTML = '';
+  window._recPool = [];
 
   try {
     const res = await fetch(`${API}/recommend`, {
@@ -722,6 +736,7 @@ async function loadRecs() {
         restrictions: prefs.restrictions || [],
         calorie_goal: prefs.calorie_goal || 2000,
         protein_goal: prefs.protein_goal || 50,
+        limit: 10,
       }),
     });
 
@@ -738,7 +753,11 @@ async function loadRecs() {
       return;
     }
 
-    data.recommendations.forEach(item => {
+    // Show top 3; store the rest as a replacement pool
+    const shown = data.recommendations.slice(0, 3);
+    window._recPool = data.recommendations.slice(3);
+
+    shown.forEach(item => {
       cards.insertAdjacentHTML('beforeend', cardHTML(item));
     });
 
@@ -1214,7 +1233,7 @@ function processMessage(text) {
         const cal = parseInt(m[1]);
         updatePrefsField('calorie_goal', cal);
         addBotMsg(`Done! Calorie goal updated to ${cal} kcal/day ✅  Refreshing your recommendations…`);
-        setTimeout(loadAgentRecs, 900);
+        setTimeout(loadRecs, 900);
         renderChips(QUICK_CHIPS_DEFAULT);
       }
       break;
@@ -1226,7 +1245,7 @@ function processMessage(text) {
         const prot = parseInt(m[1]);
         updatePrefsField('protein_goal', prot);
         addBotMsg(`Got it! Protein goal updated to ${prot}g/day ✅  Refreshing your recommendations…`);
-        setTimeout(loadAgentRecs, 900);
+        setTimeout(loadRecs, 900);
         renderChips(QUICK_CHIPS_DEFAULT);
       }
       break;
@@ -1285,7 +1304,7 @@ function addRestriction(r) {
     localStorage.setItem('jadgpt_prefs', JSON.stringify(prefs));
     renderPrefsBar(prefs);
     addBotMsg(`"${r}" added to your restrictions ✅  Refreshing recommendations…`);
-    setTimeout(loadAgentRecs, 900);
+    setTimeout(loadRecs, 900);
   }
   renderChips(QUICK_CHIPS_DEFAULT);
 }
@@ -1296,7 +1315,7 @@ function removeRestriction(r) {
   localStorage.setItem('jadgpt_prefs', JSON.stringify(prefs));
   renderPrefsBar(prefs);
   addBotMsg(`Removed "${r}" from your restrictions ✅  Refreshing…`);
-  setTimeout(loadAgentRecs, 900);
+  setTimeout(loadRecs, 900);
   renderChips(QUICK_CHIPS_DEFAULT);
 }
 
@@ -1306,7 +1325,7 @@ function clearRestrictions() {
   localStorage.setItem('jadgpt_prefs', JSON.stringify(prefs));
   renderPrefsBar(prefs);
   addBotMsg("All dietary restrictions cleared ✅  Refreshing recommendations…");
-  setTimeout(loadAgentRecs, 900);
+  setTimeout(loadRecs, 900);
   renderChips(QUICK_CHIPS_DEFAULT);
 }
 
@@ -1532,6 +1551,23 @@ function saveFeedback(feedback) {
   localStorage.setItem(FEEDBACK_KEY, JSON.stringify(feedback));
 }
 
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2200);
+}
+
+function swapCard(cardEl, newHTML) {
+  const temp = document.createElement('div');
+  temp.innerHTML = newHTML;
+  const newCard = temp.firstElementChild;
+  if (newCard) newCard.classList.add('new-card');
+  cardEl.replaceWith(newCard || temp);
+}
+
 function rateDish(name, hall, liked, btn) {
   const feedback = getFeedback();
   const key = `${name}@${hall}`;
@@ -1541,10 +1577,77 @@ function rateDish(name, hall, liked, btn) {
     .sort((a, b) => (a[1].date > b[1].date ? 1 : -1));
   if (entries.length > 30) entries.splice(0, entries.length - 30);
   saveFeedback(Object.fromEntries(entries));
+
   // Update button states
   const btns = btn.closest('.feedback-btns')?.querySelectorAll('.fb-btn');
   btns?.forEach(b => b.classList.remove('active-like', 'active-dislike'));
   btn.classList.add(liked ? 'active-like' : 'active-dislike');
+
+  if (liked) {
+    showToast('Added to favorites! The AI will recommend similar dishes 👍');
+  } else {
+    const cardEl = btn.closest('.meal-card');
+    replaceCard(cardEl, name);
+  }
+}
+
+async function replaceCard(cardEl, dislikedName) {
+  if (!cardEl) return;
+
+  // Collect names already visible on screen + all dislikes, so we don't repeat them
+  const shownNames = [...document.querySelectorAll('.meal-card .card-name')]
+    .map(el => el.textContent.trim().toLowerCase());
+  const { disliked } = buildFeedbackContext();
+  const excludeSet = new Set([
+    ...shownNames,
+    ...disliked.map(n => n.toLowerCase()),
+    dislikedName.toLowerCase(),
+  ]);
+
+  // First check the local pool
+  const pool = window._recPool || [];
+  const poolIdx = pool.findIndex(item => !excludeSet.has(item.name.toLowerCase()));
+  if (poolIdx !== -1) {
+    const [next] = pool.splice(poolIdx, 1);
+    swapCard(cardEl, cardHTML(next));
+    showToast("Noted! Here's another option 🔄");
+    return;
+  }
+
+  // Pool empty — show placeholder and fetch from backend
+  const placeholder = document.createElement('div');
+  placeholder.className = 'meal-card';
+  placeholder.style.cssText = 'opacity:.5;display:flex;align-items:center;justify-content:center;min-height:80px;font-size:.85rem;color:var(--gray)';
+  placeholder.textContent = 'Finding another option…';
+  cardEl.replaceWith(placeholder);
+
+  const prefs = getPrefs() || { restrictions: [], calorie_goal: 2000, protein_goal: 50 };
+  try {
+    const res = await fetch(`${API}/recommend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        restrictions: prefs.restrictions || [],
+        calorie_goal: prefs.calorie_goal || 2000,
+        protein_goal: prefs.protein_goal || 50,
+        limit: 8,
+        exclude: [...excludeSet],
+      }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const next = (data.recommendations || []).find(
+      item => !excludeSet.has(item.name.toLowerCase())
+    );
+    if (next) {
+      swapCard(placeholder, cardHTML(next));
+      showToast("Noted! Here's another option 🔄");
+    } else {
+      placeholder.textContent = 'No more alternatives found for your filters.';
+    }
+  } catch (e) {
+    placeholder.textContent = 'Could not load a replacement. Is Flask running?';
+  }
 }
 
 function buildFeedbackContext() {
@@ -1560,8 +1663,8 @@ function feedbackBtns(name, hall) {
   const likeClass    = fb?.liked === true  ? ' active-like'    : '';
   const dislikeClass = fb?.liked === false ? ' active-dislike' : '';
   return `<div class="feedback-btns">
-    <button class="fb-btn${likeClass}"    onclick="rateDish(${JSON.stringify(name)},${JSON.stringify(hall)},true,this)"  title="Liked this">👍</button>
-    <button class="fb-btn${dislikeClass}" onclick="rateDish(${JSON.stringify(name)},${JSON.stringify(hall)},false,this)" title="Not for me">👎</button>
+    <button class="fb-btn${likeClass}"    data-fb-name="${esc(name)}" data-fb-hall="${esc(hall)}" data-fb-liked="true"  title="Liked this">👍</button>
+    <button class="fb-btn${dislikeClass}" data-fb-name="${esc(name)}" data-fb-hall="${esc(hall)}" data-fb-liked="false" title="Not for me">👎</button>
   </div>`;
 }
 
@@ -1651,12 +1754,20 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     document.getElementById('onboarding').classList.add('hidden');
     renderPrefsBar(prefs);
+    loadRecs();
     loadAgentRecs();
   }
 
   initMap();
   setInterval(checkAutoCheckin, 60_000);
   checkAutoCheckin();
+
+  // Feedback buttons (delegated — works for dynamically inserted cards)
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.fb-btn[data-fb-name]');
+    if (!btn) return;
+    rateDish(btn.dataset.fbName, btn.dataset.fbHall, btn.dataset.fbLiked === 'true', btn);
+  });
 
   // Enter key in chat input
   document.getElementById('chat-input')?.addEventListener('keydown', e => {
